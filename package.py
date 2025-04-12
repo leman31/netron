@@ -54,7 +54,7 @@ def _version():
         '(version\\s*=\\s*")(.*)(")',
         package["version"])
     _update("./dist/pypi/netron/server.py",
-        "(__version__ = ')(.*)(')",
+        '(__version__ = ")(.*)(")',
         package["version"])
     _update("./dist/pypi/netron/index.html",
         '(<meta name="version" content=")(.*)(">)',
