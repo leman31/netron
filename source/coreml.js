@@ -213,6 +213,7 @@ coreml.Model = class {
         this.format = context.format;
         this.metadata = Array.from(context.metadata);
         this.graphs = context.graphs.map((context) => new coreml.Graph(context));
+        this.functions = context.functions.map((context) => new coreml.Graph(context));
         if (context.version) {
             this.version = context.version;
         }
@@ -226,7 +227,8 @@ coreml.Graph = class {
 
     constructor(context) {
         this.name = context.name || '';
-        this.type = context.type;
+        this.type = context.type || '';
+        this.description = context.description;
         this.groups = context.groups;
         for (const value of context.values.values()) {
             const name = value.name;
@@ -531,20 +533,21 @@ coreml.Context = class {
         this.format = format;
         this.metadata = [];
         this.graphs = [];
+        this.functions = [];
         const description = model.description;
         for (const func of description.functions) {
-            const graph = new coreml.Context.Graph(metadata, func.name, model, func, weights, values);
-            this.graphs.push(graph);
+            const graph = new coreml.Context.Graph(metadata, func.name, 'function', model, func, weights, values);
+            this.functions.push(graph);
         }
         if (description && description.defaultFunctionName) {
             const graph = this.graphs.find((graph) => graph.name === description.defaultFunctionName);
             if (graph) {
-                this.graphs.splice(this.graphs.indexOf(graph), 1);
-                this.graphs.unshift(graph);
+                this.functions.splice(this.graphs.indexOf(graph), 1);
+                this.functions.unshift(graph);
             }
         }
         if (model && !model.mlProgram || (model.mlProgram.functions && model.mlProgram.functions.main)) {
-            const graph = new coreml.Context.Graph(metadata, '', model, description, weights, values);
+            const graph = new coreml.Context.Graph(metadata, '', 'graph', model, description, weights, values);
             this.graphs.push(graph);
         }
         if (description && description.metadata) {
@@ -570,9 +573,10 @@ coreml.Context = class {
 
 coreml.Context.Graph = class {
 
-    constructor(metadata, name, model, description, weights, values) {
+    constructor(metadata, name, type, model, description, weights, values) {
         this.metadata = metadata;
         this.name = name;
+        this.type = type;
         this.weights = weights || new Map();
         this.values = values || new Map();
         this.nodes = [];
@@ -591,7 +595,7 @@ coreml.Context.Graph = class {
                 this.update(value, description);
                 this.inputs.push({ name: description.name, visible: true, value: [value] });
             }
-            this.type = this.model(model, '', description);
+            this.description = this.model(model, '', description);
             const outputs = description && Array.isArray(description.output) ? description.output : [];
             for (const description of outputs) {
                 const value = this.input(description.name);
@@ -602,7 +606,7 @@ coreml.Context.Graph = class {
     }
 
     context() {
-        return new coreml.Context.Graph(this.metadata, '', null, null, this.weights, this.values);
+        return new coreml.Context.Graph(this.metadata, '', 'graph', null, null, this.weights, this.values);
     }
 
     network(obj) {
@@ -612,7 +616,7 @@ coreml.Context.Graph = class {
             context.node(context.groups, type, layer.name, '', layer[type], layer.input, layer.output, layer.inputTensor, layer.outputTensor);
         }
         context.updatePreprocessing('', obj.preprocessing, null);
-        context.type = 'Neural Network';
+        context.description = 'Neural Network';
         return context;
     }
 
@@ -1296,7 +1300,7 @@ coreml.Context.Graph = class {
                                     break;
                                 }
                                 case 'float16':
-                                case 'int1': case 'int2': case 'int3': case 'int4': case 'int6': case 'int8':
+                                case 'int1': case 'int2': case 'int3': case 'int4': case 'int6': case 'int8': case 'int32':
                                 case 'uint1': case 'uint2': case 'uint3': case 'uint4': case 'uint6': case 'uint8': {
                                     data = stream.read(size);
                                     break;

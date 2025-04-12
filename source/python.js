@@ -653,7 +653,7 @@ python.Execution = class {
                 const position = this._position();
                 const body = [];
                 while (!this._tokenizer.match('eof')) {
-                    const statement = this._statement();
+                    const statement = this._parseStatement();
                     if (statement) {
                         body.push(statement);
                         continue;
@@ -670,7 +670,7 @@ python.Execution = class {
                 this._mark(node, position);
                 return node;
             }
-            _suite() {
+            _parseSuite() {
                 const body = [];
                 let statement = null;
                 if (this._tokenizer.eat('\n')) {
@@ -679,7 +679,7 @@ python.Execution = class {
                             if (this._tokenizer.eat(';')) {
                                 continue;
                             }
-                            statement = this._statement();
+                            statement = this._parseStatement();
                             if (statement) {
                                 body.push(statement);
                                 continue;
@@ -698,7 +698,7 @@ python.Execution = class {
                         if (this._tokenizer.eat(';')) {
                             continue;
                         }
-                        statement = this._statement();
+                        statement = this._parseStatement();
                         if (statement) {
                             body.push(statement);
                             continue;
@@ -709,7 +709,7 @@ python.Execution = class {
                 }
                 return body;
             }
-            _statement() {
+            _parseStatement() {
                 let node = null;
                 let position = this._position();
                 if (this._eat('id', 'break')) {
@@ -721,30 +721,30 @@ python.Execution = class {
                     return this._mark(node, position);
                 }
                 if (this._eat('id', 'return')) {
-                    const value = this._expression(-1, [], true);
+                    const value = this._parseExpression(-1, [], true);
                     const node = new ast.Return(value);
                     return this._mark(node, position);
                 }
                 if (this._eat('id', 'raise')) {
-                    let exc = this._expression(-1, ['from']);
+                    let exc = this._parseExpression(-1, ['from']);
                     let cause = null;
                     if (this._tokenizer.eat('id', 'from')) {
-                        cause = this._expression();
+                        cause = this._parseExpression();
                     } else if (this._tokenizer.eat(',')) {
                         exc = [exc];
-                        exc.push(this._expression());
+                        exc.push(this._parseExpression());
                         if (this._tokenizer.eat(',')) {
-                            exc.push(this._expression());
+                            exc.push(this._parseExpression());
                         }
                     }
                     node = new ast.Raise(exc, cause);
                     return this._mark(node, position);
                 }
                 if (this._eat('id', 'assert')) {
-                    const test = this._expression(-1, [',']);
+                    const test = this._parseExpression(-1, [',']);
                     let msg = null;
                     if (this._tokenizer.eat(',')) {
-                        msg = this._expression();
+                        msg = this._parseExpression();
                     }
                     node = new ast.Assert(test, msg);
                     return this._mark(node, position);
@@ -752,7 +752,7 @@ python.Execution = class {
                 if (this._eat('id', 'global')) {
                     const names = [];
                     do {
-                        const name = this._name(true);
+                        const name = this._parseName(true);
                         names.push(name.id);
                     }
                     while (this._tokenizer.eat(','));
@@ -762,7 +762,7 @@ python.Execution = class {
                 if (this._eat('id', 'nonlocal')) {
                     const names = [];
                     do {
-                        const name = this._name(true);
+                        const name = this._parseName(true);
                         names.push(name.id);
                     }
                     while (this._tokenizer.eat(','));
@@ -772,10 +772,10 @@ python.Execution = class {
                 if (this._eat('id', 'import')) {
                     const names = [];
                     do {
-                        const name = this._dottedName();
+                        const name = this._parseDottedName();
                         let asname = null;
                         if (this._tokenizer.eat('id', 'as')) {
-                            asname = this._name(true).id;
+                            asname = this._parseName(true).id;
                         }
                         const node = new ast.alias(name, asname);
                         names.push(node);
@@ -791,15 +791,15 @@ python.Execution = class {
                         this._eat(dots.type);
                         level = Array.from(dots.type).length;
                     }
-                    const module = this._dottedName();
+                    const module = this._parseDottedName();
                     this._tokenizer.expect('id', 'import');
                     const names = [];
                     const close = this._tokenizer.eat('(');
                     do {
-                        const name = this._name(true).id;
+                        const name = this._parseName(true).id;
                         let asname = null;
                         if (this._tokenizer.eat('id', 'as')) {
-                            asname = this._name(true).id;
+                            asname = this._parseName(true).id;
                         }
                         const node = new ast.alias(name, asname);
                         names.push(node);
@@ -814,14 +814,14 @@ python.Execution = class {
                 const decorator_list = this._decorator();
                 position = this._position();
                 if (this._eat('id', 'class')) {
-                    const name = this._name(true);
+                    const name = this._parseName(true);
                     const bases = [];
                     if (this._tokenizer.eat('(')) {
                         while (!this._tokenizer.eat(')')) {
                             if (this._tokenizer.eat('\n')) {
                                 continue;
                             }
-                            const expression = this._expression(-1, [], false);
+                            const expression = this._parseExpression(-1, [], false);
                             if (expression === null) {
                                 throw new python.Error(`Expected expression ${this._location()}`);
                             }
@@ -834,7 +834,7 @@ python.Execution = class {
                         }
                     }
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     const node = new ast.ClassDef(name.id, bases, null, body, decorator_list, null);
                     return this._mark(node, position);
                 }
@@ -846,15 +846,15 @@ python.Execution = class {
                     throw new python.Error(`Expected 'def', 'with' or 'for' ${this._location()}`);
                 }
                 if (this._eat('id', 'def')) {
-                    const name = this._name(true);
+                    const name = this._parseName(true);
                     this._tokenizer.expect('(');
-                    const args = this._arguments(')');
+                    const args = this._parseArguments(')');
                     let returns = null;
                     if (this._tokenizer.eat('->')) {
-                        returns = this._type();
+                        returns = this._parseType();
                     }
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     const node = new ast.FunctionDef(name.id, args, body, decorator_list, returns, null, null);
                     if (async) {
                         node.async = async;
@@ -865,39 +865,39 @@ python.Execution = class {
                     throw new python.Error('Unexpected decorator.');
                 }
                 if (this._eat('id', 'del')) {
-                    const targets = this._expression(-1, [], true);
+                    const targets = this._parseExpression(-1, [], true);
                     node = new ast.Del(targets);
                     return this._mark(node, position);
                 }
                 if (this._eat('id', 'if')) {
-                    const test = this._expression();
+                    const test = this._parseExpression();
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     const node = new ast.If(test, body);
                     let current = node;
                     this._tokenizer.eat('\n');
                     while (this._tokenizer.eat('id', 'elif')) {
-                        const test = this._expression();
+                        const test = this._parseExpression();
                         this._tokenizer.expect(':');
-                        const body = this._suite();
+                        const body = this._parseSuite();
                         current.orelse = new ast.If(test, body);
                         current = current.orelse;
                         this._tokenizer.eat('\n');
                     }
                     if (this._tokenizer.eat('id', 'else')) {
                         this._tokenizer.expect(':');
-                        current.orelse = this._suite();
+                        current.orelse = this._parseSuite();
                     }
                     return this._mark(node, position);
                 }
                 if (this._eat('id', 'while')) {
-                    const test = this._expression();
+                    const test = this._parseExpression();
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     let orelse = null;
                     if (this._tokenizer.eat('id', 'else')) {
                         this._tokenizer.expect(':');
-                        orelse = this._suite();
+                        orelse = this._parseSuite();
                     }
                     const node = new ast.While(test, body, orelse);
                     return this._mark(node, position);
@@ -907,7 +907,7 @@ python.Execution = class {
                     return this._mark(node, position);
                 }
                 if (this._eat('id', 'for')) {
-                    let target = this._expression(-1, ['in']);
+                    let target = this._parseExpression(-1, ['in']);
                     while (this._tokenizer.eat(',')) {
                         if (target instanceof ast.Tuple === false) {
                             target = new ast.Tuple([target]);
@@ -916,10 +916,10 @@ python.Execution = class {
                             target.elts.push({});
                             break;
                         }
-                        target.elts.push(this._expression(-1, ['in']));
+                        target.elts.push(this._parseExpression(-1, ['in']));
                     }
                     this._tokenizer.expect('id', 'in');
-                    let iter = this._expression();
+                    let iter = this._parseExpression();
                     while (this._tokenizer.eat(',')) {
                         if (iter.type !== 'tuple') {
                             iter = new ast.Tuple([iter]);
@@ -928,14 +928,14 @@ python.Execution = class {
                             iter.elts.push({});
                             break;
                         }
-                        iter.elts.push(this._expression(-1, ['in']));
+                        iter.elts.push(this._parseExpression(-1, ['in']));
                     }
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     let orelse = null;
                     if (this._tokenizer.eat('id', 'else')) {
                         this._tokenizer.expect(':');
-                        orelse = this._suite();
+                        orelse = this._parseSuite();
                     }
                     const node = new ast.For(target, iter, body, orelse);
                     return this._mark(node, position);
@@ -943,17 +943,17 @@ python.Execution = class {
                 if (this._eat('id', 'with')) {
                     const items = [];
                     do {
-                        const context_expr = this._expression();
+                        const context_expr = this._parseExpression();
                         let optional_vars = null;
                         if (this._tokenizer.eat('id', 'as')) {
-                            optional_vars = this._expression();
+                            optional_vars = this._parseExpression();
                         }
                         const node = new ast.withitem(context_expr, optional_vars);
                         items.push(node);
                     }
                     while (this._tokenizer.eat(','));
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     const node = new ast.With(items, body, null);
                     if (async) {
                         node.async = async;
@@ -962,40 +962,40 @@ python.Execution = class {
                 }
                 if (this._eat('id', 'try')) {
                     this._tokenizer.expect(':');
-                    const body = this._suite();
+                    const body = this._parseSuite();
                     const handlers = [];
                     let orelse = null;
                     let finalbody = null;
                     while (this._tokenizer.match('id', 'except')) {
                         this._tokenizer.expect('id', 'except');
-                        const type = this._expression();
-                        const name = this._tokenizer.eat('id', 'as') ? this._expression() : null;
+                        const type = this._parseExpression();
+                        const name = this._tokenizer.eat('id', 'as') ? this._parseExpression() : null;
                         this._tokenizer.expect(':');
-                        const body = this._suite();
+                        const body = this._parseSuite();
                         const except = new ast.ExceptHandler(type, name, body);
                         handlers.push(except);
                     }
                     if (this._tokenizer.match('id', 'else')) {
                         this._tokenizer.expect('id', 'else');
                         this._tokenizer.expect(':');
-                        orelse = this._suite();
+                        orelse = this._parseSuite();
                     }
                     if (this._tokenizer.match('id', 'finally')) {
                         this._tokenizer.expect('id', 'finally');
                         this._tokenizer.expect(':');
-                        finalbody = this._suite();
+                        finalbody = this._parseSuite();
                     }
                     const node = new ast.Try(body, handlers, orelse, finalbody);
                     return this._mark(node, position);
                 }
-                const expr = this._expression(-1, [], true);
+                const expr = this._parseExpression(-1, [], true);
                 if (expr) {
                     if (expr instanceof ast.Name && this._tokenizer.eat(':')) {
                         const position = this._position();
-                        const annotation = this._expression(-1, ['=']);
+                        const annotation = this._parseExpression(-1, ['=']);
                         let value = null;
                         if (this._tokenizer.eat('=')) {
-                            value = this._expression();
+                            value = this._parseExpression();
                         }
                         node = new ast.AnnAssign(expr, annotation, value, expr instanceof ast.Name);
                         return this._mark(node, position);
@@ -1033,7 +1033,7 @@ python.Execution = class {
                 }
                 return null;
             }
-            _expression(minPrecedence, terminal, tuple) {
+            _parseExpression(minPrecedence, terminal, tuple) {
                 minPrecedence = minPrecedence || -1;
                 const terminalSet = new Set(terminal);
                 const stack = [];
@@ -1073,7 +1073,7 @@ python.Execution = class {
                                 }
                                 if (op) {
                                     const left = stack.pop();
-                                    const right = this._expression(precedence, terminal, tuple === true ? true : false);
+                                    const right = this._parseExpression(precedence, terminal, tuple === true ? true : false);
                                     node = new ast.BinOp(left, op, right);
                                 } else {
                                     switch (token.value) {
@@ -1090,14 +1090,14 @@ python.Execution = class {
                                         default: break;
                                     }
                                     const left = stack.pop();
-                                    const comparator = this._expression(precedence, terminal, tuple === true ? true : false);
+                                    const comparator = this._parseExpression(precedence, ['for', 'if'], tuple === true ? true : false);
                                     node = new ast.Compare(left, [op], [comparator]);
                                 }
                             } else if (token.value === '*') {
-                                const value =  this._expression(precedence, terminal, tuple === true ? true : false);
+                                const value =  this._parseExpression(precedence, terminal, tuple === true ? true : false);
                                 node = new ast.Starred(value);
                             } else if (token.value === '**') {
-                                const value =  this._expression(precedence, terminal, tuple === true ? true : false);
+                                const value =  this._parseExpression(precedence, terminal, tuple === true ? true : false);
                                 node = new ast.keyword(null, value);
                             } else {
                                 let op = null;
@@ -1108,7 +1108,7 @@ python.Execution = class {
                                     case 'not': op = new ast.Not(); break;
                                     default: throw new python.Error(`Unsupported unary operator ${token.value} ${this._location()}`);
                                 }
-                                const operand =  this._expression(precedence, terminal, tuple === true ? true : false);
+                                const operand =  this._parseExpression(precedence, terminal, tuple === true ? true : false);
                                 node = new ast.UnaryOp(op, operand);
                                 node = this._mark(node, position);
                             }
@@ -1118,7 +1118,7 @@ python.Execution = class {
                     }
                     if (this._tokenizer.eat(':=')) {
                         const target = stack.pop();
-                        const value = this._expression(-1, terminal, tuple === false ? false : true);
+                        const value = this._parseExpression(-1, terminal, tuple === false ? false : true);
                         const node = new ast.NamedExpr(target, value);
                         this._mark(node, position);
                         stack.push(node);
@@ -1127,7 +1127,7 @@ python.Execution = class {
                     if (this._tokenizer.eat('=')) {
                         const position = this._position();
                         const targets = stack.pop();
-                        const value = this._expression(-1, terminal, tuple === false ? false : true);
+                        const value = this._parseExpression(-1, terminal, tuple === false ? false : true);
                         const node = new ast.Assign([targets], value);
                         this._mark(node, position);
                         stack.push(node);
@@ -1153,7 +1153,7 @@ python.Execution = class {
                     if (op) {
                         this._tokenizer.expect(token.type);
                         const target = stack.pop();
-                        const value = this._expression(-1, terminal, true);
+                        const value = this._parseExpression(-1, terminal, true);
                         const node = new ast.AugAssign(target, op, value);
                         stack.push(node);
                         continue;
@@ -1161,20 +1161,39 @@ python.Execution = class {
                     position = this._position();
                     if (this._eat('id', 'if')) {
                         const body = stack.pop();
-                        const test = this._expression();
+                        const test = this._parseExpression();
                         this._tokenizer.expect('id', 'else');
-                        const orelse = this._expression();
+                        const orelse = this._parseExpression();
                         const node = new ast.IfExp(test, body, orelse);
                         this._mark(node, position);
                         stack.push(node);
                         continue;
                     }
                     if (this._tokenizer.match('id', 'for') || this._tokenizer.match('id', 'async')) {
-                        throw new python.Error('Not implemented.');
+                        const position = this._position();
+                        const elt = stack.pop();
+                        const generators = this._parseGenerators();
+                        let node = null;
+                        if (elt instanceof ast.Dict) {
+                            if (elt.keys.length !== 1 || elt.values.length !== 1) {
+                                throw new python.Error(`Invalid dict comprehension ${this._location()}`);
+                            }
+                            node = new ast.DictComp(elt.keys[0], elt.values[0], generators);
+                        } else if (elt instanceof ast.Set) {
+                            if (elt.elts.length !== 1) {
+                                throw new python.Error(`Invalid set comprehension ${this._location()}`);
+                            }
+                            node = new ast.SetComp(elt.elts[0], generators);
+                        } else {
+                            node = new ast.GeneratorExp(elt, generators);
+                        }
+                        this._mark(node, position);
+                        stack.push(node);
+                        continue;
                     }
                     if (this._eat('id', 'lambda')) {
-                        const args = this._arguments(':');
-                        const body = this._expression(-1, terminal, false);
+                        const args = this._parseArguments(':');
+                        const body = this._parseExpression(-1, terminal, false);
                         const node = new ast.Lambda(args, body);
                         this._mark(node, position);
                         stack.push(node);
@@ -1182,13 +1201,13 @@ python.Execution = class {
                     }
                     if (this._eat('id', 'yield')) {
                         if (this._tokenizer.eat('id', 'from')) {
-                            const value = this._expression(-1, [], true);
+                            const value = this._parseExpression(-1, [], true);
                             node = new ast.YieldFrom(value);
                             stack.push(node);
                         } else {
                             const value = [];
                             do {
-                                value.push(this._expression(-1, [], false));
+                                value.push(this._parseExpression(-1, [], false));
                             }
                             while (this._tokenizer.eat(','));
                             node = new ast.Yield(value);
@@ -1197,7 +1216,7 @@ python.Execution = class {
                         continue;
                     }
                     if (this._eat('id', 'await')) {
-                        const value = this._expression(minPrecedence, terminal, tuple);
+                        const value = this._parseExpression(minPrecedence, terminal, tuple);
                         const node = new ast.Await(value);
                         this._mark(node, position);
                         stack.push(node);
@@ -1205,7 +1224,7 @@ python.Execution = class {
                     }
                     if (this._eat('.')) {
                         const value = stack.pop();
-                        const attr = this._name().id;
+                        const attr = this._parseName().id;
                         const node = new ast.Attribute(value, attr);
                         this._mark(node, position);
                         stack.push(node);
@@ -1222,7 +1241,7 @@ python.Execution = class {
                                 continue;
                             }
                             const position = this._position();
-                            const expr = this._expression(-1, [], false);
+                            const expr = this._parseExpression(-1, [], false);
                             if (expr === null) {
                                 throw new python.Error(`Expected expression ${this._location()}`);
                             }
@@ -1264,11 +1283,11 @@ python.Execution = class {
                     }
                     if (this._tokenizer.peek().type === '[') {
                         if (stack.length === 0) {
-                            stack.push(this._expressions());
+                            stack.push(this._parseList());
                         } else {
                             const value = stack.pop();
                             const position = this._position();
-                            const slice = this._slice();
+                            const slice = this._parseSlice();
                             node = new ast.Subscript(value, slice);
                             this._mark(node, position);
                             stack.push(node);
@@ -1282,7 +1301,7 @@ python.Execution = class {
                         this._tokenizer.expect('{');
                         let dict = true;
                         while (!this._tokenizer.eat('}')) {
-                            const item = this._expression(-1, [], false);
+                            const item = this._parseExpression(-1, [], false);
                             if (item === null) {
                                 throw new python.Error(`Expected expression ${this._location()}`);
                             }
@@ -1290,7 +1309,7 @@ python.Execution = class {
                                 dict = false;
                             }
                             if (dict) {
-                                const value = this._expression(-1, ['for'], false);
+                                const value = this._parseExpression(-1, ['for'], false);
                                 if (value === null) {
                                     throw new python.Error(`Expected expression ${this._location()}`);
                                 }
@@ -1298,12 +1317,12 @@ python.Execution = class {
                                     if (keys.length > 0 || values.length > 0 || elts.length > 0) {
                                         throw new python.Error(`Invalid list expression ${this._location()}`);
                                     }
-                                    const target = this._expression(-1, ['in'], true);
+                                    const target = this._parseExpression(-1, ['in'], true);
                                     this._tokenizer.expect('id', 'in');
-                                    const iter = this._expression(-1, ['for', 'if'], true);
+                                    const iter = this._parseExpression(-1, ['for', 'if'], true);
                                     const ifs = [];
                                     while (this._tokenizer.eat('id', 'if')) {
-                                        ifs.push(this._expression(-1, ['for', 'if']));
+                                        ifs.push(this._parseExpression(-1, ['for', 'if']));
                                     }
                                     const comprehension = new ast.comprehension(target, iter, ifs /*, async */);
                                     const generators = [comprehension];
@@ -1328,7 +1347,7 @@ python.Execution = class {
                         stack.push(node);
                         continue;
                     }
-                    const literal = this._literal();
+                    const literal = this._parseLiteral();
                     if (literal) {
                         if (stack.length > 0 &&
                             (literal.type === 'int' || literal.type === 'float' || literal.type === 'complex') &&
@@ -1386,7 +1405,7 @@ python.Execution = class {
                         stack.push(node);
                         continue;
                     }
-                    const name = this._name();
+                    const name = this._parseName();
                     if (name) {
                         stack.push(name);
                         continue;
@@ -1407,7 +1426,7 @@ python.Execution = class {
                         }
                         if (!this._tokenizer.match('=') && !terminalSet.has(this._tokenizer.peek().value)) {
                             const nextTerminal = terminal.slice(0).concat([',', '=']);
-                            const expression = this._expression(minPrecedence, nextTerminal, tuple);
+                            const expression = this._parseExpression(minPrecedence, nextTerminal, tuple);
                             if (expression) {
                                 node.elts.push(expression);
                                 continue;
@@ -1428,7 +1447,7 @@ python.Execution = class {
             _decorator() {
                 const list = [];
                 while (this._tokenizer.eat('@')) {
-                    const value = this._expression();
+                    const value = this._parseExpression();
                     if (!value || (value instanceof ast.Call === false && value instanceof ast.Name === false && value instanceof ast.Attribute === false)) {
                         throw new python.Error(`Invalid decorator ${this._location()}`);
                     }
@@ -1437,42 +1456,55 @@ python.Execution = class {
                 }
                 return list;
             }
-            _expressions() {
+            _parseGenerators() {
+                const generators = [];
+                while (this._tokenizer.match('id', 'for') || this._tokenizer.match('id', 'async')) {
+                    const is_async = this._eat('id', 'async') ? 1 : 0;
+                    this._tokenizer.expect('id', 'for');
+                    const target = this._parseExpression(-1, ['in'], true);
+                    this._tokenizer.expect('id', 'in');
+                    const iter = this._parseExpression(-1, ['for', 'if'], true);
+                    const ifs = [];
+                    while (this._tokenizer.eat('id', 'if')) {
+                        ifs.push(this._parseExpression(-1, ['for', 'if']));
+                    }
+                    const comprehension = new ast.comprehension(target, iter, ifs, is_async);
+                    generators.push(comprehension);
+                }
+                return generators;
+            }
+            _parseList() {
                 const elts = [];
                 this._tokenizer.expect('[');
-                while (!this._tokenizer.eat(']')) {
-                    const expression = this._expression(-1, ['for']);
-                    if (this._eat('id', 'for')) {
-                        if (elts.length > 0) {
-                            throw new python.Error(`Invalid list expression ${this._location()}`);
-                        }
-                        const target = this._expression(-1, ['in'], true);
-                        this._tokenizer.expect('id', 'in');
-                        const iter = this._expression(-1, ['for', 'if'], true);
-                        const ifs = [];
-                        while (this._tokenizer.eat('id', 'if')) {
-                            ifs.push(this._expression(-1, ['for', 'if']));
-                        }
-                        const comprehension = new ast.comprehension(target, iter, ifs /*, async */);
-                        const generators = [comprehension];
+                if (!this._tokenizer.match(']')) {
+                    const position = this._position();
+                    const expr = this._parseExpression(-1, ['for']);
+                    if (this._tokenizer.match('id', 'for')) {
+                        const generators = this._parseGenerators();
                         this._tokenizer.expect(']');
-                        return new ast.ListComp(expression, generators);
+                        const node = new ast.ListComp(expr, generators);
+                        this._mark(node, position);
+                        return node;
                     }
-                    if (expression === null) {
+                    if (expr === null) {
                         throw new python.Error(`Expected expression ${this._location()}`);
                     }
-                    elts.push(expression);
-                    this._tokenizer.eat(',');
-                    while (this._tokenizer.eat('\n')) {
-                        // continue
-                    }
-                    if (this._tokenizer.eat(']')) {
-                        break;
+                    elts.push(expr);
+                    while (this._tokenizer.eat(',')) {
+                        if (this._tokenizer.match(']')) {
+                            break;
+                        }
+                        const expr = this._parseExpression(-1, ['for']);
+                        if (!expr) {
+                            throw new python.Error(`Expected expression ${this._location()}`);
+                        }
+                        elts.push(expr);
                     }
                 }
+                this._tokenizer.expect(']');
                 return new ast.List(elts);
             }
-            _slice() {
+            _parseSlice() {
                 const elts = [];
                 let slice = [null, null, null];
                 let index = 0;
@@ -1494,7 +1526,7 @@ python.Execution = class {
                         }
                         this._tokenizer.expect(',');
                     } else {
-                        const expression = this._expression();
+                        const expression = this._parseExpression();
                         if (expression === null) {
                             throw new python.Error(`Expected expression ${this._location()}`);
                         }
@@ -1507,7 +1539,7 @@ python.Execution = class {
                 }
                 return elts[0];
             }
-            _name(required) {
+            _parseName(required) {
                 const token = this._tokenizer.peek();
                 if (token.type === 'id' && !token.keyword) {
                     const position = this._position();
@@ -1520,16 +1552,16 @@ python.Execution = class {
                 }
                 return null;
             }
-            _dottedName() {
+            _parseDottedName() {
                 const list = [];
                 do {
-                    const name = this._name(true);
+                    const name = this._parseName(true);
                     list.push(name.id);
                 }
                 while (this._tokenizer.eat('.'));
                 return list.join('.');
             }
-            _literal() {
+            _parseLiteral() {
                 const token = this._tokenizer.peek();
                 if (token.type === 'str' || token.type === 'bool' || token.type === 'int' || token.type === 'float' || token.type === 'complex') {
                     this._tokenizer.read();
@@ -1537,11 +1569,11 @@ python.Execution = class {
                 }
                 return null;
             }
-            _typeArguments() {
+            _parseTypeArguments() {
                 const list = [];
                 this._tokenizer.expect('[');
                 while (!this._tokenizer.eat(']')) {
-                    const type = this._type();
+                    const type = this._parseType();
                     if (type === null) {
                         throw new python.Error(`Expected type ${this._location()}`);
                     }
@@ -1553,11 +1585,11 @@ python.Execution = class {
                 }
                 return list;
             }
-            _type() {
-                const target = this._expression(-1, ['[', '=']);
+            _parseType() {
+                const target = this._parseExpression(-1, ['[', '=']);
                 if (target) {
                     if (this._tokenizer.peek().value === '[') {
-                        const list = this._expressions();
+                        const list = this._parseList();
                         const slice = list.elts.length === 1 ? list.elts[0] : new ast.Tuple(list.elts);
                         return new ast.Subscript(target, slice);
                     }
@@ -1565,7 +1597,7 @@ python.Execution = class {
                 }
                 return null;
             }
-            _arguments(terminal) {
+            _parseArguments(terminal) {
                 let posonlyargs = [];
                 let args = [];
                 let vararg = null;
@@ -1577,9 +1609,9 @@ python.Execution = class {
                 let is_vararg = false; // '*'
                 let is_kwarg = false; // '**'
                 const read = (required) => {
-                    const name = this._name(required);
+                    const name = this._parseName(required);
                     if (name) {
-                        const annotation = terminal !== ':' && this._tokenizer.eat(':') ? this._type() : null;
+                        const annotation = terminal !== ':' && this._tokenizer.eat(':') ? this._parseType() : null;
                         return new ast.arg(name.id, annotation, null);
                     }
                     return null;
@@ -1610,7 +1642,7 @@ python.Execution = class {
                             this._tokenizer.expect(terminal);
                             break;
                         }
-                        const default_value = this._tokenizer.eat('=') ? this._expression() : null;
+                        const default_value = this._tokenizer.eat('=') ? this._parseExpression() : null;
                         if (!is_vararg && !is_kwarg) {
                             if (is_slash) {
                                 args.push(arg);
@@ -2335,6 +2367,9 @@ python.Execution = class {
             static __new__(cls, ...args) {
                 return execution.invoke(cls, args);
             }
+            static __setattr__(obj, name, value) {
+                builtins.setattr(obj, name, value);
+            }
         });
         this.registerType('builtins.tuple', class extends Array {
             constructor(items) {
@@ -3029,6 +3064,9 @@ python.Execution = class {
                 value.flags = this.flags;
                 return value;
             }
+            reshape(shape, order) {
+                return new numpy.ndarray(shape, this.dtype, this.data, this.offset, this.strides, order);
+            }
             tobytes() {
                 return this.data;
             }
@@ -3223,7 +3261,53 @@ python.Execution = class {
         this.registerType('pandas.core.arrays.categorical.Categorical', class {});
         this.registerType('pandas.core.arrays.datetimes.DatetimeArray', class {});
         this.registerType('pandas.core.arrays.integer.IntegerArray', class {});
-        this.registerType('pandas.core.frame.DataFrame', class {});
+        this.registerType('pandas.core.generic.Flags', class {});
+        this.registerType('pandas.core.generic.NDFrame', class {
+            constructor(data) {
+                this._internal_names = ["_mgr", "_item_cache", "_cache", "_name", "_metadata", "_flags"];
+                this._metadata = [];
+                builtins.object.__setattr__(self, "_mgr", data);
+                builtins.object.__setattr__(self, "_attrs", {});
+                builtins.object.__setattr__(self, "_flags", new pandas.core.generic.Flags(this, true));
+            }
+            __setstate__(state) {
+                if (state instanceof pandas.core.internals.managers.BlockManager) {
+                    this._mgr = state;
+                } else if (state instanceof builtins.dict) {
+                    if (state.__contains__('_data') && !state.__contains__('_mgr')) {
+                        state.__setitem__('_mgr', state.pop('_data'));
+                    }
+                    const typ = state.get('_typ');
+                    if (typ) {
+                        let attrs = state.get('_attrs', new builtins.dict());
+                        if (!attrs) {
+                            attrs = new builtins.dict();
+                        }
+                        builtins.object.__setattr__(this, '_attrs', attrs);
+                        const flags = state.get('_flags', new builtins.dict({ 'allows_duplicate_labels': true }));
+                        builtins.object.__setattr__(this, '_flags', new pandas.core.generic.Flags(this, flags));
+                        const meta = new builtins.set(this._internal_names.concat(this._metadata));
+                        for (const k of meta) {
+                            if (state.__contains__(k) && k !== '_flags') {
+                                const v = state.__getitem__(k);
+                                builtins.object.__setattr__(this, k, v);
+                            }
+                        }
+                        for (const [k, v] of state) {
+                            if (!meta.has(k)) {
+                                builtins.object.__setattr__(this, k, v);
+                            }
+                        }
+                    } else {
+                        throw new python.Error('Pre-0.12 pickles are no longer supported.');
+                    }
+                } else if (state.size === 2) {
+                    throw new python.Error('Pre-0.12 pickles are no longer supported.');
+                }
+            }
+        });
+        this.registerType('pandas.core.frame.DataFrame', class extends pandas.core.generic.NDFrame {
+        });
         this.registerFunction('pandas.core.indexes.base._new_Index', (cls, d) => {
             return new cls(d);
         });
@@ -3314,6 +3398,7 @@ python.Execution = class {
         this.registerType('sklearn.compose._target.TransformedTargetRegressor', class {});
         this.registerType('sklearn.cross_decomposition._pls.PLSRegression', class {});
         this.registerType('sklearn.decomposition._fastica.FastICA', class {});
+        this.registerType('sklearn.decomposition._incremental_pca.IncrementalPCA', class {});
         this.registerType('sklearn.decomposition._pca.PCA', class {});
         this.registerType('sklearn.decomposition._truncated_svd.TruncatedSVD', class {});
         this.registerType('sklearn.decomposition.pca.PCA', class {});
@@ -3342,6 +3427,7 @@ python.Execution = class {
         this.registerType('sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor', class {});
         this.registerType('sklearn.ensemble._iforest.IsolationForest', class {});
         this.registerType('sklearn.ensemble._stacking.StackingClassifier', class {});
+        this.registerType('sklearn.ensemble._stacking.StackingRegressor', class {});
         this.registerType('sklearn.ensemble._voting.VotingClassifier', class {});
         this.registerType('sklearn.ensemble._voting.VotingRegressor', class {});
         this.registerType('sklearn.ensemble._weight_boosting.AdaBoostClassifier', class {});
@@ -3407,6 +3493,7 @@ python.Execution = class {
         this.registerType('sklearn.linear_model._sgd_fast.ModifiedHuber', class {});
         this.registerType('sklearn.linear_model._sgd_fast.SquaredHinge', class {});
         this.registerType('sklearn.linear_model._stochastic_gradient.SGDClassifier', class {});
+        this.registerType('sklearn.linear_model._stochastic_gradient.SGDRegressor', class {});
         this.registerType('sklearn.linear_model.base.LinearRegression', class {});
         this.registerType('sklearn.linear_model.sgd_fast.Hinge', class {});
         this.registerType('sklearn.linear_model.LogisticRegression', class {});
@@ -4158,6 +4245,7 @@ python.Execution = class {
         this.registerType('xgboost.core.Booster', class {});
         this.registerType('xgboost.sklearn.XGBClassifier', class {});
         this.registerType('xgboost.sklearn.XGBRegressor', class {});
+        this.registerType('xgboost.sklearn.XGBRFClassifier', class {});
         this.registerFunction('_codecs.encode', (obj, encoding) => {
             return execution.invoke('builtins.bytearray', [obj, encoding]);
         });
@@ -4303,7 +4391,16 @@ python.Execution = class {
         this.registerFunction('builtins.setattr', (obj, name, value) => {
             obj[name] = value;
         });
-        this.registerType('builtins.set', class extends Set {});
+        this.registerType('builtins.set', class extends Set {
+            __contains__(item) {
+                return this.has(item);
+            }
+            update(iterable) {
+                for (const item of iterable) {
+                    this.add(item);
+                }
+            }
+        });
         this.registerType('builtins.slice', class {
             constructor(start, stop, step) {
                 this.start = start;
@@ -4660,13 +4757,16 @@ python.Execution = class {
         this.registerFunction('nolearn.lasagne.base.objective');
         this.registerFunction('numpy.core._DType_reconstruct');
         this.registerFunction('numpy.core._ufunc_reconstruct');
-        this.registerFunction('numpy.core.numeric._frombuffer', (/* buf, dtype, shape, order */) => {
-            return {};
-        });
         this.registerFunction('numpy.core.multiarray._reconstruct', (subtype, shape, dtype) => {
             return numpy.ndarray.__new__(subtype, shape, dtype);
         });
-        this.registerFunction('numpy._core.numeric._frombuffer');
+        this.registerFunction('numpy.core.multiarray.frombuffer', (buf, dtype) => {
+            const shape = [buf.length / dtype.itemsize];
+            return new numpy.ndarray(shape, dtype, buf);
+        });
+        this.registerFunction('numpy._core.numeric._frombuffer', (buf, dtype, shape, order) => {
+            return numpy._core.multiarray.frombuffer(buf, dtype).reshape(shape, order);
+        });
         this.registerFunction('numpy._core._internal._convert_to_stringdtype_kwargs', () => {
             return new numpy.dtypes.StringDType();
         });
@@ -4766,6 +4866,7 @@ python.Execution = class {
         this.register('numpy._core.multiarray', numpy.core.multiarray);
         this.register('numpy._core._multiarray_umath', numpy.core._multiarray_umath);
         this.register('numpy._core._multiarray_umath', numpy.core._multiarray_umath);
+        this.register('numpy.core.numeric', numpy._core.numeric);
         numpy._core._multiarray_umath._reconstruct = numpy.core.multiarray._reconstruct;
         this.registerFunction('numpy.load', (file) => {
             // https://github.com/numpy/numpy/blob/main/numpy/lib/format.py
@@ -5624,14 +5725,14 @@ python.Execution = class {
             }
         });
         this.registerFunction('torch._C.isinstance', (stack, types) => {
-            const ty = torch._C.pop(stack).type();
+            const ty = stack.pop().type();
             for (const candidate of types) {
                 if (ty.isSubtypeOf(candidate)) {
-                    torch._C.push(stack, true);
+                    stack.push(true);
                     return;
                 }
             }
-            torch._C.push(stack, false);
+            stack.push(false);
         });
         this.registerType('torch._C.Tuple', class {
             constructor(elements) {
@@ -6827,6 +6928,7 @@ python.Execution = class {
         this.registerType('torch.nn.modules.conv.LazyConv2d', class {});
         this.registerType('torch.nn.modules.conv.LazyConv3d', class {});
         this.registerType('torch.nn.modules.conv.LazyConvTranspose2d', class {});
+        this.registerType('torch.nn.modules.conv.LazyConvTranspose3d', class {});
         this.registerType('torch.nn.modules.distance.CosineSimilarity', class extends torch.nn.modules.module.Module {});
         this.registerType('torch.nn.modules.distance.PairwiseDistance', class extends torch.nn.modules.module.Module {});
         this.registerType('torch.nn.modules.dropout._DropoutNd', class extends torch.nn.modules.module.Module {});
@@ -6844,6 +6946,7 @@ python.Execution = class {
         this.registerType('torch.nn.modules.instancenorm.InstanceNorm2d', class {});
         this.registerType('torch.nn.modules.instancenorm.InstanceNorm3d', class {});
         this.registerType('torch.nn.modules.instancenorm.LazyInstanceNorm2d', class {});
+        this.registerType('torch.nn.modules.instancenorm.LazyInstanceNorm3d', class {});
         this.registerType('torch.nn.modules.linear._LinearWithBias', class {});
         this.registerType('torch.nn.modules.linear.Bilinear', class extends torch.nn.modules.module.Module {});
         this.registerType('torch.nn.modules.linear.Identity', class extends torch.nn.modules.module.Module {});
@@ -6892,9 +6995,11 @@ python.Execution = class {
         this.registerType('torch.nn.modules.padding.ReplicationPad3d', class extends torch.nn.modules.padding._ReplicationPadNd {});
         this.registerType('torch.nn.modules.padding.ZeroPad1d', class {});
         this.registerType('torch.nn.modules.padding.ZeroPad2d', class {});
+        this.registerType('torch.nn.modules.padding.ZeroPad3d', class {});
         this.registerType('torch.nn.modules.padding.ConstantPad1d', class {});
         this.registerType('torch.nn.modules.padding.ConstantPad2d', class {});
         this.registerType('torch.nn.modules.padding.ConstantPad3d', class {});
+        this.registerType('torch.nn.modules.padding.CircularPad3d', class {});
         this.registerType('torch.nn.modules.pixelshuffle.PixelShuffle', class {});
         this.registerType('torch.nn.modules.pixelshuffle.PixelUnshuffle', class {});
         this.registerType('torch.nn.modules.pooling._AdaptiveAvgPoolNd', class extends torch.nn.modules.module.Module {});
@@ -6908,8 +7013,10 @@ python.Execution = class {
         this.registerType('torch.nn.modules.pooling.AvgPool2d', class {});
         this.registerType('torch.nn.modules.pooling.AvgPool3d', class {});
         this.registerType('torch.nn.modules.pooling.FractionalMaxPool2d', class {});
+        this.registerType('torch.nn.modules.pooling.FractionalMaxPool3d', class {});
         this.registerType('torch.nn.modules.pooling.LPPool1d', class {});
         this.registerType('torch.nn.modules.pooling.LPPool2d', class {});
+        this.registerType('torch.nn.modules.pooling.LPPool3d', class {});
         this.registerType('torch.nn.modules.pooling._MaxPoolNd', class extends torch.nn.modules.module.Module {});
         this.registerType('torch.nn.modules.pooling.MaxPool1d', class extends torch.nn.modules.pooling._MaxPoolNd {});
         this.registerType('torch.nn.modules.pooling.MaxPool2d', class extends torch.nn.modules.pooling._MaxPoolNd {});
@@ -7397,6 +7504,7 @@ python.Execution = class {
         this.registerFunction('torch.fx._symbolic_trace.wrap', (fn_or_name) => {
             return fn_or_name;
         });
+        this.registerFunction('torch.fx._symbolic_trace._assert_is_none');
         this.registerFunction('torchvision.datasets.folder.default_loader');
         this.registerType('torchvision.datasets.folder.ImageFolder', class {});
         this.registerType('torchvision.datasets.mnist.FashionMNIST', class {});
@@ -7485,6 +7593,7 @@ python.Execution = class {
         this.registerType('torchvision.models.inception.InceptionC', class {});
         this.registerType('torchvision.models.inception.InceptionD', class {});
         this.registerType('torchvision.models.inception.InceptionE', class {});
+        this.registerFunction('torchvision.models.inception.inception_v3');
         this.registerType('torchvision.models.mnasnet._InvertedResidual', class {});
         this.registerType('torchvision.models.mnasnet.MNASNet', class {});
         this.registerType('torchvision.models.maxvit.MaxVit', class {});
@@ -7579,7 +7688,10 @@ python.Execution = class {
         this.registerType('torchvision.transforms.transforms.RandomAffine', class extends torch.nn.modules.module.Module {});
         this.registerType('torchvision.transforms.transforms.RandomApply', class extends torch.nn.modules.module.Module {});
         this.registerType('torchvision.transforms.transforms.RandomCrop', class extends torch.nn.modules.module.Module {});
+        this.registerType('torchvision.transforms.transforms.RandomChoice', class {});
         this.registerType('torchvision.transforms.transforms.RandomErasing', class {});
+        this.registerType('torchvision.transforms.transforms.RandomInvert', class {});
+        this.registerType('torchvision.transforms.transforms.RandomPerspective', class {});
         this.registerType('torchvision.transforms.transforms.RandomHorizontalFlip', class extends torch.nn.modules.module.Module {});
         this.registerType('torchvision.transforms.transforms.RandomVerticalFlip', class extends torch.nn.modules.module.Module {});
         this.registerType('torchvision.transforms.transforms.RandomResizedCrop', class extends torch.nn.modules.module.Module {});
@@ -17711,7 +17823,7 @@ python.Execution = class {
         });
         this.registerType('torch._export.serde.schema.BufferMutationSpec', class {
             constructor(obj) {
-                this.arg = new torch._export.serde.schema.Argument(obj.arg);
+                this.arg = new torch._export.serde.schema.TensorArgument(obj.arg);
                 this.buffer_name = obj.buffer_name;
             }
         });
@@ -18431,6 +18543,7 @@ python.Execution = class {
         this.registerType('torch._dynamo.eval_frame.OptimizedModule', class extends torch.nn.modules.module.Module {});
         this.registerType('torch._dynamo.eval_frame.OptimizeContext', class extends torch._dynamo.eval_frame._TorchDynamoContext {});
         this.registerType('torch._dynamo.hooks.Hooks', class {});
+        this.registerType('torch._dynamo.output_graph.GraphCompileReason', class {});
         this.registerType('torch._dynamo.repro.after_dynamo.WrapBackendDebug', class {});
         this.registerType('torch._TorchCompileInductorWrapper', class {});
         this.registerFunction('torch._inductor.compile_fx.compile_fx');
@@ -19101,6 +19214,7 @@ python.Execution = class {
         this.registerType('fastai.vision.augment.Brightness', class {});
         this.registerType('fastai.vision.augment.flip_mat', class {});
         this.registerType('fastai.vision.augment.Flip', class {});
+        this.registerType('fastai.vision.augment.RandomResizedCrop', class {});
         this.registerType('fastai.vision.augment.RandomResizedCropGPU', class {});
         this.registerType('fastai.vision.augment.Resize', class {});
         this.registerType('fastai.vision.augment.rotate_mat', class {});

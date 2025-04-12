@@ -166,16 +166,21 @@ host.ElectronHost = class {
             this._view.export(data.file);
         });
         electron.ipcRenderer.on('cut', () => {
-            this._view.cut();
+            this.document.execCommand('cut');
         });
         electron.ipcRenderer.on('copy', () => {
-            this._view.copy();
+            this.document.execCommand('copy');
         });
         electron.ipcRenderer.on('paste', () => {
-            this._view.paste();
+            if (this.document.queryCommandSupported('paste')) {
+                this.document.execCommand('paste');
+            } else if (this.document.queryCommandSupported('insertText')) {
+                const content = electron.clipboard.readText();
+                this.document.execCommand('insertText', false, content);
+            }
         });
         electron.ipcRenderer.on('selectall', () => {
-            this._view.selectAll();
+            this.document.execCommand('selectall');
         });
         electron.ipcRenderer.on('toggle', (sender, name) => {
             this._view.toggle(name);
@@ -191,7 +196,7 @@ host.ElectronHost = class {
             this._view.resetZoom();
         });
         electron.ipcRenderer.on('show-properties', () => {
-            this._element('sidebar-button').click();
+            this._element('sidebar-target-button').click();
         });
         electron.ipcRenderer.on('find', () => {
             this._view.find();
@@ -457,17 +462,23 @@ host.ElectronHost = class {
                 return;
             }
             try {
-                const model = await this._view.open(context);
-                this._view.show(null);
-                const options = { ...this._view.options };
-                if (model) {
-                    options.path = path;
-                    this._title(location.label);
+                const attachment = await this._view.attach(context);
+                if (attachment) {
+                    this._view.show(null);
                 } else {
-                    options.path = path;
-                    this._title('');
+                    const model = await this._view.open(context);
+                    this._view.show(null);
+                    const options = { ...this._view.options };
+                    if (model) {
+                        options.path = path;
+                        this._title(location.label);
+                    } else {
+                        options.path = path;
+                        this._title('');
+                    }
+                    electron.ipcRenderer.send('update-recents', { path });
+                    this.update(options);
                 }
-                this.update(options);
             } catch (error) {
                 const options = { ...this._view.options };
                 if (error) {
