@@ -904,55 +904,57 @@ view.View = class {
                     elements.push(nodeElements[0]);
                 }
             }
-            const size = canvas.getBBox();
-            const margin = 100;
-            const width = Math.ceil(margin + size.width + margin);
-            const height = Math.ceil(margin + size.height + margin);
-            origin.setAttribute('transform', `translate(${margin - size.x}, ${margin - size.y}) scale(1)`);
-            background.setAttribute('width', width);
-            background.setAttribute('height', height);
-            this._width = width;
-            this._height = height;
-            delete this._scrollLeft;
-            delete this._scrollRight;
-            canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
-            canvas.setAttribute('width', width);
-            canvas.setAttribute('height', height);
-            const state = this._stack && this._stack.length > 0 && this._stack[0] && this._stack[0].state ? this._stack[0].state : null;
-            this._zoom = state ? state.zoom : 1;
-            this._updateZoom(this._zoom);
-            const container = this._element('graph');
-            const context = state ? viewGraph.select([state.context]) : [];
-            if (context.length > 0) {
-                this.scrollTo(context, 'instant');
-            } else if (elements && elements.length > 0) {
-                // Center view based on input elements
-                const bounds = container.getBoundingClientRect();
-                const xs = [];
-                const ys = [];
-                for (let i = 0; i < elements.length; i++) {
-                    const element = elements[i];
-                    const rect = element.getBoundingClientRect();
-                    const width = Math.min(rect.width, bounds.width);
-                    const height = Math.min(rect.width, bounds.width);
-                    xs.push(rect.left + (width / 2));
-                    ys.push(rect.top + (height / 2));
+            this._host.window.requestAnimationFrame(() => {
+                const size = canvas.getBBox();
+                const margin = 100;
+                const width = Math.ceil(margin + size.width + margin);
+                const height = Math.ceil(margin + size.height + margin);
+                origin.setAttribute('transform', `translate(${margin - size.x}, ${margin - size.y}) scale(1)`);
+                background.setAttribute('width', width);
+                background.setAttribute('height', height);
+                this._width = width;
+                this._height = height;
+                delete this._scrollLeft;
+                delete this._scrollRight;
+                canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                canvas.setAttribute('width', width);
+                canvas.setAttribute('height', height);
+                const state = this._stack && this._stack.length > 0 && this._stack[0] && this._stack[0].state ? this._stack[0].state : null;
+                this._zoom = state ? state.zoom : 1;
+                this._updateZoom(this._zoom);
+                const container = this._element('graph');
+                const context = state ? viewGraph.select([state.context]) : [];
+                if (context.length > 0) {
+                    this.scrollTo(context, 'instant');
+                } else if (elements && elements.length > 0) {
+                    // Center view based on input elements
+                    const bounds = container.getBoundingClientRect();
+                    const xs = [];
+                    const ys = [];
+                    for (let i = 0; i < elements.length; i++) {
+                        const element = elements[i];
+                        const rect = element.getBoundingClientRect();
+                        const width = Math.min(rect.width, bounds.width);
+                        const height = Math.min(rect.width, bounds.width);
+                        xs.push(rect.left + (width / 2));
+                        ys.push(rect.top + (height / 2));
+                    }
+                    let [x] = xs;
+                    const [y] = ys;
+                    if (ys.every((y) => y === ys[0])) {
+                        x = xs.reduce((a, b) => a + b, 0) / xs.length;
+                    }
+                    const left = (container.scrollLeft + x - bounds.left) - (bounds.width / 2);
+                    const top = (container.scrollTop + y - bounds.top) - (bounds.height / 2);
+                    container.scrollTo({ left, top, behavior: 'auto' });
+                } else {
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const graphRect = container.getBoundingClientRect();
+                    const left = (container.scrollLeft + (canvasRect.width / 2) - graphRect.left) - (graphRect.width / 2);
+                    const top = (container.scrollTop + (canvasRect.height / 2) - graphRect.top) - (graphRect.height / 2);
+                    container.scrollTo({ left, top, behavior: 'auto' });
                 }
-                let [x] = xs;
-                const [y] = ys;
-                if (ys.every((y) => y === ys[0])) {
-                    x = xs.reduce((a, b) => a + b, 0) / xs.length;
-                }
-                const left = (container.scrollLeft + x - bounds.left) - (bounds.width / 2);
-                const top = (container.scrollTop + y - bounds.top) - (bounds.height / 2);
-                container.scrollTo({ left, top, behavior: 'auto' });
-            } else {
-                const canvasRect = canvas.getBoundingClientRect();
-                const graphRect = container.getBoundingClientRect();
-                const left = (container.scrollLeft + (canvasRect.width / 2) - graphRect.left) - (graphRect.width / 2);
-                const top = (container.scrollTop + (canvasRect.height / 2) - graphRect.top) - (graphRect.height / 2);
-                container.scrollTo({ left, top, behavior: 'auto' });
-            }
+            });
             this._graph = viewGraph;
         }
         return status;
