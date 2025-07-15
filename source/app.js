@@ -395,36 +395,38 @@ app.Application = class {
                 });
             }
 
-            menuTemplate.push({
-                label: '&File',
-                submenu: [
-                    {
-                        label: '&Open...',
-                        accelerator: 'CmdOrCtrl+O',
-                        click: () => this._open(null)
-                    },
-                    {
-                        label: 'Open &Recent',
-                        submenu: menuRecentsTemplate
-                    },
-                    { type: 'separator' },
-                    {
-                        id: 'file.export',
-                        label: '&Export...',
-                        accelerator: 'CmdOrCtrl+Shift+E',
-                        click: async () => await this.execute('export', null)
-                    },
-                    { type: 'separator' },
-                    { role: 'close' },
-                ]
-            });
+            const fileSubmenu = [
+                {
+                    label: '&Open...',
+                    accelerator: 'CmdOrCtrl+O',
+                    click: () => this._open(null)
+                },
+                {
+                    label: 'Open &Recent',
+                    submenu: menuRecentsTemplate
+                },
+                { type: 'separator' },
+                {
+                    id: 'file.export',
+                    label: '&Export...',
+                    accelerator: 'CmdOrCtrl+Shift+E',
+                    click: async () => await this.execute('export', null)
+                },
+                { type: 'separator' },
+                { role: 'close' },
+            ];
 
             if (!darwin) {
-                menuTemplate.slice(-1)[0].submenu.push(
+                fileSubmenu.push(
                     { type: 'separator' },
                     { role: 'quit' }
                 );
             }
+
+            menuTemplate.push({
+                label: '&File',
+                submenu: fileSubmenu
+            });
 
             if (darwin) {
                 electron.systemPreferences.setUserDefault('NSDisabledDictationMenuItem', 'boolean', true);
@@ -660,7 +662,7 @@ app.View = class {
             width: size.width > 1024 ? 1024 : size.width,
             height: size.height > 768 ? 768 : size.height,
             webPreferences: {
-                preload: path.join(dirname, 'electron.mjs'),
+                preload: path.join(dirname, 'desktop.mjs'),
                 nodeIntegration: true,
                 enableDeprecatedPaste: true
             }
@@ -691,7 +693,7 @@ app.View = class {
         this._window.on('unmaximize', () => this.state());
         this._window.on('enter-full-screen', () => this.state('enter-full-screen'));
         this._window.on('leave-full-screen', () => this.state('leave-full-screen'));
-        this._window.webContents.on('did-finish-load', () => {
+        this._window.webContents.once('did-finish-load', () => {
             this._didFinishLoad = true;
         });
         this._window.webContents.setWindowOpenHandler((detail) => {
@@ -707,7 +709,13 @@ app.View = class {
         if (owner.application.environment.titlebar && process.platform !== 'darwin') {
             this._window.removeMenu();
         }
-        this._loadURL();
+        const pathname = path.join(dirname, 'index.html');
+        let content = fs.readFileSync(pathname, 'utf-8');
+        content = content.replace(/<\s*script[^>]*>[\s\S]*?(<\s*\/script[^>]*>|$)/ig, '');
+        const data = `data:text/html;charset=utf-8,${encodeURIComponent(content)}`;
+        this._window.loadURL(data, {
+            baseURLForDataURL: url.pathToFileURL(pathname).toString()
+        });
     }
 
     get window() {
@@ -718,29 +726,24 @@ app.View = class {
         return this._path;
     }
 
-    open(path) {
+    async open(path) {
         this._openPath = path;
         const location = app.Application.location(path);
-        if (this._didFinishLoad) {
-            this._window.webContents.send('open', location);
-        } else {
-            this._window.webContents.on('did-finish-load', () => {
-                this._window.webContents.send('open', location);
-            });
-            this._loadURL();
-        }
-    }
-
-    _loadURL() {
-        const dirname = path.dirname(url.fileURLToPath(import.meta.url));
-        const pathname = path.join(dirname, 'index.html');
-        let content = fs.readFileSync(pathname, 'utf-8');
-        content = content.replace(/<\s*script[^>]*>[\s\S]*?(<\s*\/script[^>]*>|$)/ig, '');
-        const data = `data:text/html;charset=utf-8,${encodeURIComponent(content)}`;
-        const options = {
-            baseURLForDataURL: url.pathToFileURL(pathname).toString()
-        };
-        this._window.loadURL(data, options);
+        await new Promise((resolve) => {
+            if (this._didFinishLoad) {
+                resolve();
+            } else {
+                this._window.webContents.once('did-finish-load', resolve);
+            }
+        });
+        await new Promise((resolve) => {
+            if (this._window.isVisible()) {
+                resolve();
+            } else {
+                this._window.once('ready-to-show', resolve);
+            }
+        });
+        this._window.webContents.send('open', location);
     }
 
     restore() {
@@ -974,12 +977,13 @@ app.ConfigurationService = class {
             const data = fs.readFileSync(this._file, 'utf-8');
             if (data) {
                 try {
-                    this._content = JSON.parse(data);
-                    if (Array.isArray(this._content.recents)) {
-                        this._content.recents = this._content.recents.map((recent) => typeof recent !== 'string' && recent && recent.path ? recent.path : recent);
+                    const content = JSON.parse(data);
+                    if (Array.isArray(content.recents)) {
+                        content.recents = content.recents.map((recent) => typeof recent !== 'string' && recent && recent.path ? recent.path : recent);
                     }
+                    this._content = content;
                 } catch {
-                    // continue regardless of error
+                    // Silently ignore parsing errors and use empty config
                 }
             }
         }

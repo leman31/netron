@@ -9,7 +9,7 @@ keras.ModelFactory = class {
 
     async match(context) {
         const identifier = context.identifier;
-        const extension = identifier.split('.').pop().toLowerCase();
+        const extension = identifier.lastIndexOf('.') > 0 ? identifier.split('.').pop().toLowerCase() : '';
         const group = await context.peek('hdf5');
         if (group && group.attributes && group.attributes.get('CLASS') !== 'hickle') {
             if (identifier === 'model.weights.h5') {
@@ -773,9 +773,7 @@ keras.Graph = class {
                                     layer.inputs = [];
                                     layer.outputs = [];
                                     layer.args = {};
-                                    /* eslint-disable prefer-destructuring */
-                                    layer.inbound_node = layer.inbound_nodes[0];
-                                    /* eslint-enable prefer-destructuring */
+                                    [layer.inbound_node] = layer.inbound_nodes;
                                     nodes.set(`${layer.name}[${first_index}]`, layer);
                                 } else {
                                     let config = {};

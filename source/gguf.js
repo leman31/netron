@@ -59,8 +59,11 @@ gguf.Model = class {
             const model = { type: architecture, metadata: new Map(), layers: Array.from(layers.values()) };
             for (const [name, value] of metadata) {
                 if (name.startsWith('tokenizer.')) {
-                    const [, param] = name.match(/^(.*)\.(.*?)$/).slice(1);
-                    tokenizer.metadata.set(param, value);
+                    const match = name.match(/^(.*)\.(.*?)$/);
+                    if (match) {
+                        const [, param] = match.slice(1);
+                        tokenizer.metadata.set(param, value);
+                    }
                 } else if (architecture && name.startsWith(`${architecture}.`)) {
                     model.metadata.set(name, value);
                 } else {
@@ -191,7 +194,8 @@ gguf.Reader = class {
     static open(context) {
         const stream = context.stream;
         if (stream && stream.length > 4) {
-            const signature = String.fromCharCode.apply(null, stream.peek(4));
+            const buffer = stream.peek(4);
+            const signature = String.fromCharCode.apply(null, buffer);
             if (signature === 'GGUF') {
                 return new gguf.Reader(context);
             }
@@ -324,16 +328,32 @@ gguf.BinaryReader = class {
         return this._reader.byte();
     }
 
-    int32() {
-        return this._reader.int32();
+    int8() {
+        return this._reader.int8();
+    }
+
+    uint16() {
+        return this._reader.uint16();
+    }
+
+    int16() {
+        return this._reader.int16();
     }
 
     uint32() {
         return this._reader.uint32();
     }
 
+    int32() {
+        return this._reader.int32();
+    }
+
     uint64() {
         return this._reader.uint64();
+    }
+
+    int64() {
+        return this._reader.int64();
     }
 
     float32() {
@@ -348,21 +368,17 @@ gguf.BinaryReader = class {
 
     value(type) {
         switch (type) {
-            case gguf.Type.UINT32: {
-                return this.uint32();
-            }
-            case gguf.Type.INT32: {
-                return this.int32();
-            }
-            case gguf.Type.FLOAT32: {
-                return this.float32();
-            }
-            case gguf.Type.BOOL: {
-                return this.byte() !== 0;
-            }
-            case gguf.Type.STRING: {
-                return this.string();
-            }
+            case gguf.Type.UINT8: return this.byte();
+            case gguf.Type.INT8: return this.int8();
+            case gguf.Type.UINT16: return this.uint16();
+            case gguf.Type.INT16: return this.int16();
+            case gguf.Type.UINT32: return this.uint32();
+            case gguf.Type.INT32: return this.int32();
+            case gguf.Type.UINT64: return this.uint64();
+            case gguf.Type.INT64: return this.int64();
+            case gguf.Type.FLOAT32: return this.float32();
+            case gguf.Type.BOOL: return this.byte() !== 0;
+            case gguf.Type.STRING: return this.string();
             case gguf.Type.ARRAY: {
                 const type = this.uint32();
                 const size = this.uint64().toNumber();

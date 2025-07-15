@@ -187,12 +187,16 @@ onnx.Graph = class {
             const tensor = context.tensor(value.name);
             tensor.type = context.createType(value.type);
             tensor.description = value.doc_string;
+            const metadata_props = value.metadata_props || [];
+            tensor.metadata = metadata_props.map((metadata) => new onnx.Argument(metadata.key, metadata.value));
             return tensor;
         });
         graph.output = graph.output.map((value) => {
             const tensor = context.tensor(value.name);
             tensor.type = context.createType(value.type);
             tensor.description = value.doc_string;
+            const metadata_props = value.metadata_props || [];
+            tensor.metadata = metadata_props.map((metadata) => new onnx.Argument(metadata.key, metadata.value));
             return tensor;
         });
         const inference = new onnx.Inference(graph.node);
@@ -203,20 +207,20 @@ onnx.Graph = class {
         this._nodes = context.pop();
         for (const input of graph.input) {
             const value = context.value(input.name);
+            value.metadata = input.metadata || [];
             if (!value.initializer) {
                 this._inputs.push(new onnx.Argument(input.name, [value]));
             }
         }
         for (const output of graph.output) {
             const value = context.value(output.name);
+            value.metadata = output.metadata || [];
             if (!value.initializer) {
                 this._outputs.push(new onnx.Argument(output.name, [value]));
             }
         }
         const metadata_props = graph.metadata_props || [];
-        this.metadata = metadata_props.map((metadata) => {
-            return new onnx.Argument(metadata.key, metadata.value);
-        });
+        this.metadata = metadata_props.map((metadata) => new onnx.Argument(metadata.key, metadata.value));
     }
 
     get name() {
@@ -928,6 +932,11 @@ onnx.Context.Model = class {
     }
 
     get functions() {
+        for (const [, func] of this._functions) {
+            if (func instanceof onnx.Function === false) {
+                this.type(func.domain, func.name, func.overload);
+            }
+        }
         return Array.from(this._functions.values());
     }
 
@@ -948,7 +957,7 @@ onnx.Context.Model = class {
             let value = null;
             if (this._functions.has(key)) {
                 value = this._functions.get(key);
-                if (value.domain !== undefined) {
+                if (value && value instanceof onnx.Function === false) {
                     value = new onnx.Function(this, value);
                     this._functions.set(key, value);
                 }
@@ -1595,7 +1604,7 @@ onnx.ProtoReader = class {
                 return new onnx.ProtoReader(context, 'text', 'model');
             }
             const identifier = context.identifier;
-            const extension = identifier.split('.').pop().toLowerCase();
+            const extension = identifier.lastIndexOf('.') > 0 ? identifier.split('.').pop().toLowerCase() : '';
             if (tags.has('graph') && extension !== 'model') {
                 return new onnx.ProtoReader(context, 'text', 'model');
             }
@@ -1720,7 +1729,7 @@ onnx.ProtoReader = class {
         const location = (tensor) => {
             if (onnx.proto && tensor instanceof onnx.proto.SparseTensorProto) {
                 location(tensor.indices);
-                location(tensor.indices);
+                location(tensor.values);
             } else if (tensor.data_location === onnx.DataLocation.EXTERNAL && Array.isArray(tensor.external_data)) {
                 for (const entry of tensor.external_data) {
                     if (entry.key === 'location') {
@@ -1785,7 +1794,7 @@ onnx.OrtReader = class {
 
     static async open(context) {
         const identifier = context.identifier;
-        const extension = identifier.split('.').pop().toLowerCase();
+        const extension = identifier.lastIndexOf('.') > 0 ? identifier.split('.').pop().toLowerCase() : '';
         const reader = await context.peek('flatbuffers.binary');
         if (reader && reader.identifier === 'ORTM') {
             return new onnx.OrtReader(context);
@@ -2785,7 +2794,7 @@ onnx.PickleReader = class {
 
     static async open(context) {
         const identifier = context.identifier;
-        const extension = identifier.split('.').pop().toLowerCase();
+        const extension = identifier.lastIndexOf('.') > 0 ? identifier.split('.').pop().toLowerCase() : '';
         const stream = context.stream;
         if (extension === 'onnx' && stream && stream.length > 3) {
             const signature = stream.peek(2);

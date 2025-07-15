@@ -43,19 +43,21 @@ protoc.Namespace = class extends protoc.Object {
         if (path && path.length > 0 && path[0] === '') {
             throw new protoc.Error('Invalid path.');
         }
-        let parent = this;
+        /* eslint-disable consistent-this */
+        let current = this;
+        /* eslint-enable consistent-this */
         while (path.length > 0) {
             const part = path.shift();
-            if (parent.children && parent.children.get(part)) {
-                parent = parent.children.get(part);
-                if (!(parent instanceof protoc.Namespace)) {
+            if (current.children && current.children.get(part)) {
+                current = current.children.get(part);
+                if (current instanceof protoc.Namespace === false) {
                     throw new protoc.Error('Invalid path.');
                 }
             } else {
-                parent = new protoc.Namespace(parent, part);
+                current = new protoc.Namespace(current, part);
             }
         }
-        return parent;
+        return current;
     }
 
     defineType(name) {
@@ -1338,7 +1340,7 @@ protoc.Generator = class {
             for (const field of Array.from(type.fields.values()).filter((field) => field.required)) {
                 this._builder.add(`if (!Object.prototype.hasOwnProperty.call(message, '${field.name}')) {`);
                 this._builder.indent();
-                    this._builder.add(`throw new Error("Excepted '${field.name}'.");`);
+                    this._builder.add(`throw new Error("Expected '${field.name}'.");`);
                 this._builder.outdent();
                 this._builder.add('}');
             }
@@ -1406,7 +1408,7 @@ protoc.Generator = class {
                 for (const field of Array.from(type.fields.values()).filter((field) => field.required)) {
                     this._builder.add(`if (!Object.prototype.hasOwnProperty.call(message, "${field.name}")) {`);
                     this._builder.indent();
-                        this._builder.add(`throw new Error("Excepted '${field.name}'.");`);
+                        this._builder.add(`throw new Error("Expected '${field.name}'.");`);
                     this._builder.outdent();
                     this._builder.add('}');
                 }
@@ -1464,7 +1466,7 @@ protoc.Generator = class {
                         } else if (field.type.name === 'int64' || field.type.name === 'uint64' || field.type.name === 'fixed64' || field.type.name === 'sint64') {
                             this._builder.add(`${target} = BigInt(${source});`);
                         } else if (field.type.name === 'bytes') {
-                            this._builder.add(`${target} = typeof source === 'string' ? Uint8Array.from(atob(${source}), (c) => c.charCodeAt(0)) : Uint8Array.from(${source});`);
+                            this._builder.add(`${target} = typeof ${source} === 'string' ? Uint8Array.from(atob(${source}), (c) => c.charCodeAt(0)) : Uint8Array.from(${source});`);
                         } else if (field.type.name === 'string' || field.type.name === 'bool') {
                             this._builder.add(`${target} = ${source};`);
                         } else {
