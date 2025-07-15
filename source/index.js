@@ -65,7 +65,7 @@ window.exports.preload = function(callback) {
                             next();
                         }
                     }
-                }, true);
+                });
             }
             /* eslint-enable no-loop-func */
         }
@@ -113,7 +113,7 @@ window.addEventListener('load', function() {
         if (error) {
             window.exports.terminate(error.message);
         } else {
-            var host = new window.exports.browser.BrowserHost();
+            var host = new window.exports.browser.Host();
             window.__view__ = new window.exports.view.View(host);
             window.__view__.start();
         }

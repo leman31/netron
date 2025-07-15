@@ -28,7 +28,7 @@ numpy.ModelFactory = class {
                 format = 'NumPy Array';
                 const unresolved = new Set();
                 const execution = new python.Execution();
-                execution.on('resolve', (_, name) => unresolved.add(name));
+                execution.on('resolve', (sender, name) => unresolved.add(name));
                 const stream = context.stream;
                 const bytes = execution.invoke('io.BytesIO', [stream]);
                 const array = execution.invoke('numpy.load', [bytes]);
@@ -41,7 +41,7 @@ numpy.ModelFactory = class {
                 break;
             }
             case 'npz': {
-                format = 'NumPy Zip';
+                format = 'NumPy Archive';
                 const layers = new Map();
                 const entries = Array.from(context.value);
                 const separator = entries.every(([name]) => name.endsWith('.weight.npy')) ? '.' : '/';

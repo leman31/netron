@@ -98,23 +98,6 @@ const exec = async (command, encoding, cwd) => {
     }
     child_process.execSync(command, { cwd, stdio: [0,1,2] });
     return '';
-    /*
-    return new Promise((resolve, reject) => {
-        const child = child_process.exec(command, { cwd: dirname() }, (error, stdout, stderr) => {
-            if (error) {
-                stderr = '\n' + stderr ;
-                if (error.message && error.message.endsWith(stderr)) {
-                    error.message = error.message.slice(0, -stderr.length);
-                }
-                reject(error);
-            } else {
-                resolve(stdout);
-            }
-        });
-        child.stdout.pipe(process.stdout);
-        child.stderr.pipe(process.stderr);
-    });
-    */
 };
 
 const sleep = (delay) => {
@@ -126,7 +109,7 @@ const sleep = (delay) => {
 const request = async (url, init, status) => {
     const response = await fetch(url, init);
     if (status !== false && !response.ok) {
-        throw new Error(response.status.toString());
+        throw new Error(`${response.status.toString()} ${response.statusText}`);
     }
     if (response.body) {
         const reader = response.body.getReader();
@@ -196,12 +179,12 @@ const fork = async (organization, repository) => {
     await exec(`git clone --depth=2 https://x-access-token:${process.env.GITHUB_TOKEN}@github.com/${process.env.GITHUB_USER}/${repository}.git dist/${repository}`);
 };
 
-const pullrequest = async (organization, repository, body) => {
+const pullrequest = async (organization, repository, token, body) => {
     writeLine(`github push ${repository}`);
     await exec(`git -C dist/${repository} push`);
     writeLine(`github pullrequest ${repository}`);
     const headers = {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+        Authorization: `Bearer ${token}`
     };
     await request(`https://api.github.com/repos/${organization}/${repository}/pulls`, {
         method: 'POST',
@@ -273,7 +256,8 @@ const build = async (target) => {
             const extensions = new Set(['html', 'css', 'js', 'json', 'ico', 'png']);
             await copy(source_dir, dist_dir, (file) => extensions.has(file.split('.').pop()));
             await rm('dist', 'web', 'app.js');
-            await rm('dist', 'web', 'electron.js');
+            await rm('dist', 'web', 'node.js');
+            await rm('dist', 'web', 'desktop.mjs');
             const contentFile = dirname('dist', 'web', 'index.html');
             let content = await fs.readFile(contentFile, 'utf-8');
             content = content.replace(/(<meta\s*name="version"\s*content=")(.*)(">)/m, (match, p1, p2, p3) => {
@@ -286,13 +270,23 @@ const build = async (target) => {
             break;
         }
         case 'electron': {
-            writeLine('build electron');
+            const key = [read(), read()].filter((x) => x).join(' ');
+            const target = key ? `electron ${key}` : 'electron';
+            writeLine(`build ${target}`);
             await install();
             await exec('npx electron-builder install-app-deps');
-            await exec('npx electron-builder --mac --universal --publish never -c.mac.identity=null');
-            await exec('npx electron-builder --win --x64 --arm64 --publish never');
-            await exec('npx electron-builder --linux appimage --x64 --publish never');
-            await exec('npx electron-builder --linux snap --x64 --publish never');
+            const table = new Map([
+                ['mac',            'npx electron-builder --mac --universal --publish never -c.mac.identity=null'],
+                ['windows',        'npx electron-builder --win --x64 --arm64 --publish never'],
+                ['linux appimage', 'npx electron-builder --linux appimage --x64 --publish never'],
+                ['linux snap',     'npx electron-builder --linux snap --x64 --publish never'],
+            ]);
+            const targets = table.has(key) ? [table.get(key)] : Array.from(table.values());
+            for (const target of targets) {
+                /* eslint-disable no-await-in-loop */
+                await exec(target);
+                /* eslint-enable no-await-in-loop */
+            }
             break;
         }
         case 'python': {
@@ -388,7 +382,7 @@ const publish = async (target) => {
             writeLine('git push homebrew-cask');
             await exec('git -C dist/homebrew-cask add --all');
             await exec(`git -C dist/homebrew-cask commit -m "${configuration.name} ${configuration.version}"`);
-            await pullrequest('Homebrew', 'homebrew-cask', {
+            await pullrequest('Homebrew', 'homebrew-cask', process.env.GITHUB_TOKEN, {
                 title: `${configuration.name} ${configuration.version}`,
                 body: 'Update version and sha256',
                 head: `${process.env.GITHUB_USER}:master`,
@@ -487,7 +481,7 @@ const publish = async (target) => {
             writeLine('git push winget-pkgs');
             await exec('git -C dist/winget-pkgs add --all');
             await exec(`git -C dist/winget-pkgs commit -m "Update ${configuration.name} to ${configuration.version}"`);
-            await pullrequest('microsoft', 'winget-pkgs', {
+            await pullrequest('microsoft', 'winget-pkgs', process.env.WINGET_TOKEN, {
                 title: `Update ${configuration.productName} to ${configuration.version}`,
                 body: '',
                 head: `${process.env.GITHUB_USER}:master`,
@@ -513,12 +507,12 @@ const publish = async (target) => {
 const lint = async () => {
     await install();
     writeLine('eslint');
-    await exec('npx eslint --config publish/eslint.config.js *.*js source/*.*js test/*.*js publish/*.*js tools/*.js --cache --cache-location ./dist/lint/.eslintcache');
+    await exec('npx eslint --cache --cache-location ./dist/lint/.eslintcache');
     writeLine('ruff');
     await exec('python -m ruff check . --quiet');
 };
 
-const validate = async() => {
+const validate = async () => {
     writeLine('lint');
     await lint();
     writeLine('test');
@@ -526,15 +520,18 @@ const validate = async() => {
 };
 
 const update = async () => {
-    const dependencies = { ...configuration.dependencies, ...configuration.devDependencies };
-    for (const name of Object.keys(dependencies)) {
-        writeLine(name);
-        /* eslint-disable no-await-in-loop */
-        await exec(`npm install --quiet --no-progress --silent --save-exact ${name}@latest`);
-        /* eslint-enable no-await-in-loop */
+    const filter = new Set(process.argv.length > 3 ? process.argv.slice(3) : []);
+    if (filter.size === 0) {
+        const dependencies = { ...configuration.dependencies, ...configuration.devDependencies };
+        for (const name of Object.keys(dependencies)) {
+            writeLine(name);
+            /* eslint-disable no-await-in-loop */
+            await exec(`npm install --quiet --no-progress --silent --save-exact ${name}@latest`);
+            /* eslint-enable no-await-in-loop */
+        }
+        await install();
     }
-    await install();
-    const targets = process.argv.length > 3 ? process.argv.slice(3) : [
+    let targets = [
         'armnn',
         'bigdl',
         'caffe', 'circle', 'cntk', 'coreml',
@@ -552,9 +549,22 @@ const update = async () => {
         'uff',
         'xmodel'
     ];
+    let commands = [
+        'sync',
+        'install',
+        'schema',
+        'metadata'
+    ];
+    if (filter.size > 0 && targets.some((target) => filter.has(target))) {
+        targets = targets.filter((target) => filter.has(target));
+    }
+    if (filter.size > 0 && commands.some((target) => filter.has(target))) {
+        commands = commands.filter((command) => filter.has(command));
+    }
+    commands = commands.join(' ');
     for (const target of targets) {
         /* eslint-disable no-await-in-loop */
-        await exec(`tools/${target} sync install schema metadata`);
+        await exec(`tools/${target} ${commands}`);
         /* eslint-enable no-await-in-loop */
     }
 };

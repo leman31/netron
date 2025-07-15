@@ -436,6 +436,9 @@
     "name": "_caffe2::RoIAlign(Tensor features, Tensor rois, str order, float spatial_scale, int pooled_h, int pooled_w, int sampling_ratio, bool aligned, Tensor[]? _caffe2_preallocated_outputs=None) -> Tensor"
   },
   {
+    "name": "aqlm::code2x8_lut_matmat.out(Tensor input, Tensor codes, Tensor codebooks, Tensor scales, Tensor? bias, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
     "name": "aten::Bool.Tensor(Tensor a) -> bool"
   },
   {
@@ -497,6 +500,27 @@
   },
   {
     "name": "aten::ComplexImplicit(Tensor a) -> complex"
+  },
+  {
+    "name": "aten::Delete.t(t[](a!) self, int idx) -> ()"
+  },
+  {
+    "name": "aten::Delete.Dict_str(Dict(str, t)(a!) self, str key) -> ()"
+  },
+  {
+    "name": "aten::Delete.Dict_int(Dict(int, t)(a!) self, int key) -> ()"
+  },
+  {
+    "name": "aten::Delete.Dict_bool(Dict(bool, t)(a!) self, bool key) -> ()"
+  },
+  {
+    "name": "aten::Delete.Dict_float(Dict(float, t)(a!) self, float key) -> ()"
+  },
+  {
+    "name": "aten::Delete.Dict_complex(Dict(complex, t)(a!) self, complex key) -> ()"
+  },
+  {
+    "name": "aten::Delete.Dict_Tensor(Dict(Tensor, t)(a!) self, Tensor key) -> ()"
   },
   {
     "name": "aten::Float.Tensor(Tensor a) -> float"
@@ -771,6 +795,9 @@
     "name": "aten::_aminmax.dim_out(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) out0, Tensor(b!) out1) -> (Tensor(a!), Tensor(b!))"
   },
   {
+    "name": "aten::_assert_tensor_metadata(Tensor a, SymInt[]? size=None, SymInt[]? stride=None, ScalarType? dtype=None, *, Device? device=None, Layout? layout=None) -> ()"
+  },
+  {
     "name": "aten::_autocast_to_full_precision(Tensor(a) self, bool cuda_enabled, bool cpu_enabled) -> Tensor(a)"
   },
   {
@@ -956,6 +983,12 @@
     "category": "Tensor"
   },
   {
+    "name": "aten::_sparse_mm(Tensor sparse, Tensor dense) -> Tensor"
+  },
+  {
+    "name": "aten::_sparse_mm.reduce(Tensor sparse, Tensor dense, str reduce) -> Tensor"
+  },
+  {
     "name": "aten::_test_serialization_subcmul(Tensor self, Tensor other, Scalar alpha=1) -> Tensor"
   },
   {
@@ -987,6 +1020,12 @@
   },
   {
     "name": "aten::_unique2.out(Tensor self, bool sorted=True, bool return_inverse=False, bool return_counts=False, *, Tensor(a!) out0, Tensor(b!) out1, Tensor(c!) out2) -> (Tensor(a!), Tensor(b!), Tensor(c!))"
+  },
+  {
+    "name": "aten::_unsafe_index.Tensor(Tensor self, Tensor?[] indices) -> Tensor"
+  },
+  {
+    "name": "aten::_unsafe_index.Tensor_hacked_twin(Tensor self, Tensor[] indices) -> Tensor"
   },
   {
     "name": "aten::_unsafe_view(Tensor self, SymInt[] size) -> Tensor"
@@ -1229,6 +1268,12 @@
   },
   {
     "name": "aten::addmm.out(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::addmm.dtype_out(Tensor self, Tensor mat1, Tensor mat2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::addmm.dtype(Tensor self, Tensor mat1, Tensor mat2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1) -> Tensor"
   },
   {
     "name": "aten::addmm_(Tensor(a!) self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor(a!)"
@@ -1596,6 +1641,12 @@
     "name": "aten::baddbmm.out(Tensor self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::baddbmm.dtype_out(Tensor self, Tensor batch1, Tensor batch2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::baddbmm.dtype(Tensor self, Tensor batch1, Tensor batch2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1) -> Tensor"
+  },
+  {
     "name": "aten::baddbmm_(Tensor(a!) self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1) -> Tensor(a!)"
   },
   {
@@ -1651,10 +1702,10 @@
     "name": "aten::binary_cross_entropy_with_logits.out(Tensor self, Tensor target, Tensor? weight=None, Tensor? pos_weight=None, int reduction=1, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
-    "name": "aten::bincount(Tensor self, Tensor? weights=None, int minlength=0) -> Tensor"
+    "name": "aten::bincount(Tensor self, Tensor? weights=None, SymInt minlength=0) -> Tensor"
   },
   {
-    "name": "aten::bincount.out(Tensor self, Tensor? weights=None, int minlength=0, *, Tensor(a!) out) -> Tensor(a!)"
+    "name": "aten::bincount.out(Tensor self, Tensor? weights=None, SymInt minlength=0, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
     "name": "aten::binomial(Tensor count, Tensor prob, Generator? generator=None) -> Tensor"
@@ -1804,6 +1855,12 @@
     "name": "aten::bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::bmm.dtype_out(Tensor self, Tensor mat2, ScalarType out_dtype, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::bmm.dtype(Tensor self, Tensor mat2, ScalarType out_dtype) -> Tensor"
+  },
+  {
     "name": "aten::broadcast_tensors(Tensor[] tensors) -> Tensor[]"
   },
   {
@@ -1879,6 +1936,12 @@
   },
   {
     "name": "aten::channel_shuffle.out(Tensor self, SymInt groups, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::cholesky_solve(Tensor self, Tensor input2, bool upper=False) -> Tensor"
+  },
+  {
+    "name": "aten::cholesky_solve.out(Tensor self, Tensor input2, bool upper=False, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
     "name": "aten::chr(int i) -> str"
@@ -2562,17 +2625,20 @@
     "category": "Transform"
   },
   {
-    "name": "aten::embedding.out(Tensor weight, Tensor indices, SymInt padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False, *, Tensor(a!) out) -> Tensor(a!)"
+    "name": "aten::embedding.out(Tensor weight, Tensor indices, SymInt padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False, *, Tensor(a!) out) -> Tensor(a!)",
+    "category": "Transform"
   },
   {
     "name": "aten::embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None, bool include_last_offset=False) -> (Tensor, Tensor, Tensor, Tensor)",
     "category": "Transform"
   },
   {
-    "name": "aten::embedding_bag.padding_idx(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq, int mode, bool sparse, Tensor? per_sample_weights, bool include_last_offset, int? padding_idx) -> (Tensor, Tensor, Tensor, Tensor)"
+    "name": "aten::embedding_bag.padding_idx(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq, int mode, bool sparse, Tensor? per_sample_weights, bool include_last_offset, int? padding_idx) -> (Tensor, Tensor, Tensor, Tensor)",
+    "category": "Transform"
   },
   {
-    "name": "aten::embedding_renorm_(Tensor(a!) self, Tensor indices, float max_norm, float norm_type) -> Tensor(a!)"
+    "name": "aten::embedding_renorm_(Tensor(a!) self, Tensor indices, float max_norm, float norm_type) -> Tensor(a!)",
+    "category": "Transform"
   },
   {
     "name": "aten::empty.memory_format(SymInt[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor"
@@ -2903,6 +2969,18 @@
     "name": "aten::fft_rfftn.out(Tensor self, SymInt[1]? s=None, int[1]? dim=None, str? norm=None, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::fill.Scalar(Tensor self, Scalar value) -> Tensor"
+  },
+  {
+    "name": "aten::fill.Scalar_out(Tensor self, Scalar value, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::fill.Tensor(Tensor self, Tensor value) -> Tensor"
+  },
+  {
+    "name": "aten::fill.Tensor_out(Tensor self, Tensor value, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
     "name": "aten::fill_.Scalar(Tensor(a!) self, Scalar value) -> Tensor(a!)"
   },
   {
@@ -3115,7 +3193,8 @@
     "category": "Activation"
   },
   {
-    "name": "aten::gelu.out(Tensor self, *, str approximate=\"none\", Tensor(a!) out) -> Tensor(a!)"
+    "name": "aten::gelu.out(Tensor self, *, str approximate=\"none\", Tensor(a!) out) -> Tensor(a!)",
+    "category": "Activation"
   },
   {
     "name": "aten::gelu_(Tensor(a!) self, *, str approximate=\"none\") -> Tensor(a!)",
@@ -3542,6 +3621,9 @@
     "name": "aten::is_scripting() -> bool"
   },
   {
+    "name": "aten::isdigit(str self) -> bool"
+  },
+  {
     "name": "aten::isfinite(Tensor self) -> Tensor"
   },
   {
@@ -3623,16 +3705,16 @@
     "name": "aten::kl_div(Tensor self, Tensor target, int reduction=1, *, bool log_target=False) -> Tensor"
   },
   {
-    "name": "aten::kthvalue(Tensor self, int k, int dim=-1, bool keepdim=False) -> (Tensor values, Tensor indices)"
+    "name": "aten::kthvalue(Tensor self, SymInt k, int dim=-1, bool keepdim=False) -> (Tensor values, Tensor indices)"
   },
   {
-    "name": "aten::kthvalue.dimname(Tensor self, int k, str dim, bool keepdim=False) -> (Tensor values, Tensor indices)"
+    "name": "aten::kthvalue.dimname(Tensor self, SymInt k, str dim, bool keepdim=False) -> (Tensor values, Tensor indices)"
   },
   {
-    "name": "aten::kthvalue.dimname_out(Tensor self, int k, str dim, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)"
+    "name": "aten::kthvalue.dimname_out(Tensor self, SymInt k, str dim, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)"
   },
   {
-    "name": "aten::kthvalue.values(Tensor self, int k, int dim=-1, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)"
+    "name": "aten::kthvalue.values(Tensor self, SymInt k, int dim=-1, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)"
   },
   {
     "name": "aten::l1_loss(Tensor self, Tensor target, int reduction=1) -> Tensor"
@@ -3725,6 +3807,30 @@
     "name": "aten::lerp.Tensor_out(Tensor self, Tensor end, Tensor weight, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::less.Tensor(Tensor self, Tensor other) -> Tensor"
+  },
+  {
+    "name": "aten::less.Scalar(Tensor self, Scalar other) -> Tensor"
+  },
+  {
+    "name": "aten::less.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::less.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::less_equal.Tensor(Tensor self, Tensor other) -> Tensor"
+  },
+  {
+    "name": "aten::less_equal.Scalar(Tensor self, Scalar other) -> Tensor"
+  },
+  {
+    "name": "aten::less_equal.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::less_equal.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
     "name": "aten::lift_fresh(Tensor(a) self) -> Tensor(a)"
   },
   {
@@ -3734,10 +3840,22 @@
     "name": "aten::lift_fresh_copy.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::linalg_cholesky(Tensor self, *, bool upper=False) -> Tensor"
+  },
+  {
+    "name": "aten::linalg_cholesky.out(Tensor self, *, bool upper=False, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
     "name": "aten::linalg_cross(Tensor self, Tensor other, *, int dim=-1) -> Tensor"
   },
   {
     "name": "aten::linalg_cross.out(Tensor self, Tensor other, *, int dim=-1, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::linalg_det(Tensor A) -> Tensor"
+  },
+  {
+    "name": "aten::linalg_det.out(Tensor A, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
     "name": "aten::linalg_inv(Tensor A) -> Tensor"
@@ -3750,6 +3868,24 @@
   },
   {
     "name": "aten::linalg_inv_ex.inverse(Tensor A, *, bool check_errors=False, Tensor(a!) inverse, Tensor(b!) info) -> (Tensor(a!) inverse, Tensor(b!) info)"
+  },
+  {
+    "name": "aten::linalg_lstsq(Tensor self, Tensor b, float? rcond=None, *, str? driver=None) -> (Tensor solution, Tensor residuals, Tensor rank, Tensor singular_values)"
+  },
+  {
+    "name": "aten::linalg_lstsq.out(Tensor self, Tensor b, float? rcond=None, *, str? driver=None, Tensor(a!) solution, Tensor(b!) residuals, Tensor(c!) rank, Tensor(d!) singular_values) -> (Tensor(a!) solution, Tensor(b!) residuals, Tensor(c!) rank, Tensor(d!) singular_values)"
+  },
+  {
+    "name": "aten::linalg_matrix_norm(Tensor self, Scalar ord, int[] dim=[-2, -1], bool keepdim=False, *, ScalarType? dtype=None) -> Tensor"
+  },
+  {
+    "name": "aten::linalg_matrix_norm.str_ord(Tensor self, str ord=\"fro\", int[] dim=[-2, -1], bool keepdim=False, *, ScalarType? dtype=None) -> Tensor"
+  },
+  {
+    "name": "aten::linalg_matrix_norm.out(Tensor self, Scalar ord, int[] dim=[-2, -1], bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::linalg_matrix_norm.str_ord_out(Tensor self, str ord=\"fro\", int[] dim=[-2, -1], bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)"
   },
   {
     "name": "aten::linalg_norm(Tensor self, Scalar? ord=None, int[1]? dim=None, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor"
@@ -4155,6 +4291,12 @@
     "name": "aten::lt.str(str a, str b) -> bool"
   },
   {
+    "name": "aten::mT(Tensor(a) self) -> Tensor(a)"
+  },
+  {
+    "name": "aten::mT.a(Tensor(a) self) -> Tensor(a)"
+  },
+  {
     "name": "aten::manual_seed(int seed) -> ()"
   },
   {
@@ -4376,6 +4518,12 @@
     "name": "aten::mm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::mm.dtype_out(Tensor self, Tensor mat2, ScalarType out_dtype, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::mm.dtype(Tensor self, Tensor mat2, ScalarType out_dtype) -> Tensor"
+  },
+  {
     "name": "aten::moveaxis.intlist(Tensor(a) self, int[] source, int[] destination) -> Tensor(a)"
   },
   {
@@ -4514,11 +4662,24 @@
     "name": "aten::narrow_copy.out(Tensor self, int dim, SymInt start, SymInt length, *, Tensor(a!) out) -> Tensor(a!)"
   },
   {
+    "name": "aten::native_dropout(Tensor input, float p, bool? train) -> (Tensor, Tensor)"
+  },
+  {
+    "name": "aten::native_dropout.out(Tensor input, float p, bool? train, *, Tensor(a!) out0, Tensor(b!) out1) -> (Tensor(a!), Tensor(b!))"
+  },
+  {
+    "name": "aten::native_group_norm(Tensor input, Tensor? weight, Tensor? bias, SymInt N, SymInt C, SymInt HxW, int group, float eps) -> (Tensor, Tensor, Tensor)"
+  },
+  {
+    "name": "aten::native_group_norm.out(Tensor input, Tensor? weight, Tensor? bias, SymInt N, SymInt C, SymInt HxW, int group, float eps, *, Tensor(a!) out0, Tensor(b!) out1, Tensor(c!) out2) -> (Tensor(a!), Tensor(b!), Tensor(c!))"
+  },
+  {
     "name": "aten::native_layer_norm(Tensor input, SymInt[] normalized_shape, Tensor? weight, Tensor? bias, float eps) -> (Tensor, Tensor, Tensor)",
     "category": "Normalization"
   },
   {
-    "name": "aten::native_layer_norm.out(Tensor input, SymInt[] normalized_shape, Tensor? weight, Tensor? bias, float eps, *, Tensor(a!) out0, Tensor(b!) out1, Tensor(c!) out2) -> (Tensor(a!), Tensor(b!), Tensor(c!))"
+    "name": "aten::native_layer_norm.out(Tensor input, SymInt[] normalized_shape, Tensor? weight, Tensor? bias, float eps, *, Tensor(a!) out0, Tensor(b!) out1, Tensor(c!) out2) -> (Tensor(a!), Tensor(b!), Tensor(c!))",
+    "category": "Normalization"
   },
   {
     "name": "aten::ne.Tensor(Tensor self, Tensor other) -> Tensor"
@@ -4725,6 +4886,18 @@
     "name": "aten::normal_(Tensor(a!) self, float mean=0., float std=1., *, Generator? generator=None) -> Tensor(a!)"
   },
   {
+    "name": "aten::not_equal.Tensor(Tensor self, Tensor other) -> Tensor"
+  },
+  {
+    "name": "aten::not_equal.Scalar(Tensor self, Scalar other) -> Tensor"
+  },
+  {
+    "name": "aten::not_equal.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::not_equal.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
     "name": "aten::nuclear_norm(Tensor self, bool keepdim=False) -> Tensor"
   },
   {
@@ -4765,6 +4938,9 @@
   },
   {
     "name": "aten::ones_like.out(Tensor self, *, MemoryFormat? memory_format=None, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::ord(str string) -> int"
   },
   {
     "name": "aten::outer(Tensor self, Tensor vec2) -> Tensor"
@@ -5108,6 +5284,12 @@
   },
   {
     "name": "aten::randint_like.out(Tensor self, SymInt high, *, MemoryFormat? memory_format=None, Tensor(a!) out) -> Tensor(a!)"
+  },
+  {
+    "name": "aten::randint_like.Tensor(Tensor self, Tensor high, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor"
+  },
+  {
+    "name": "aten::randint_like.Tensor_out(Tensor self, Tensor high, *, MemoryFormat? memory_format=None, Tensor(a!) out) -> Tensor(a!)"
   },
   {
     "name": "aten::randint_like.low_dtype_out(Tensor self, SymInt low, SymInt high, *, MemoryFormat? memory_format=None, Tensor(a!) out) -> Tensor(a!)"
@@ -5783,6 +5965,24 @@
     "name": "aten::sort.any(t[](a!) self, bool reverse=False) -> ()"
   },
   {
+    "name": "aten::sorted.int(int[](a) input) -> int[]"
+  },
+  {
+    "name": "aten::sorted.float(float[](a) input) -> float[]"
+  },
+  {
+    "name": "aten::sorted.Tensor(Tensor[](a) input) -> Tensor[]"
+  },
+  {
+    "name": "aten::sorted.bool(bool[](a) input) -> bool[]"
+  },
+  {
+    "name": "aten::sorted.str(str[](a) input) -> str[]"
+  },
+  {
+    "name": "aten::sorted.any(t[](a) self) -> t[]"
+  },
+  {
     "name": "aten::sparse_bsr_tensor.crow_col_value_size(Tensor crow_indices, Tensor col_indices, Tensor values, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False) -> Tensor"
   },
   {
@@ -5843,10 +6043,12 @@
     "category": "Tensor"
   },
   {
-    "name": "aten::split_with_sizes_copy(Tensor self, SymInt[] split_sizes, int dim=0) -> Tensor[]"
+    "name": "aten::split_with_sizes_copy(Tensor self, SymInt[] split_sizes, int dim=0) -> Tensor[]",
+    "category": "Tensor"
   },
   {
-    "name": "aten::split_with_sizes_copy.out(Tensor self, SymInt[] split_sizes, int dim=0, *, Tensor(a!)[] out) -> ()"
+    "name": "aten::split_with_sizes_copy.out(Tensor self, SymInt[] split_sizes, int dim=0, *, Tensor(a!)[] out) -> ()",
+    "category": "Tensor"
   },
   {
     "name": "aten::splitlines(str self, bool keepends=False) -> str[]"
@@ -7676,13 +7878,22 @@
     "name": "quantized::conv_transpose2d_unpack(__torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weights) -> (Tensor unpacked_weights, Tensor? B_origin)"
   },
   {
-    "name": "quantized::embedding_bag_4bit_rowwise_offsets(Tensor weight, Tensor indices, Tensor? offsets=None, bool scale_grad_by_freq=False, int mode=0, bool pruned_weights=False, Tensor? per_sample_weights=None, Tensor? compressed_indices_mapping=None, bool include_last_offset=False) -> Tensor"
+    "name": "quantized::embedding_bag_4bit_rowwise_offsets(Tensor weight, Tensor indices, Tensor? offsets=None, bool scale_grad_by_freq=False, int mode=0, bool pruned_weights=False, Tensor? per_sample_weights=None, Tensor? compressed_indices_mapping=None, bool include_last_offset=False) -> Tensor",
+    "category": "Transform"
   },
   {
-    "name": "quantized::embedding_bag_byte_rowwise_offsets(Tensor weight, Tensor indices, Tensor? offsets=None, bool scale_grad_by_freq=False, int mode=0, bool pruned_weights=False, Tensor? per_sample_weights=None, Tensor? compressed_indices_mapping=None, bool include_last_offset=False) -> Tensor"
+    "name": "quantized::embedding_bag_byte_rowwise_offsets(Tensor weight, Tensor indices, Tensor? offsets=None, bool scale_grad_by_freq=False, int mode=0, bool pruned_weights=False, Tensor? per_sample_weights=None, Tensor? compressed_indices_mapping=None, bool include_last_offset=False) -> Tensor",
+    "category": "Transform"
   },
   {
-    "name": "quantized::embedding_byte(__torch__.torch.classes.quantized.EmbeddingPackedParamsBase weight, Tensor indices, bool pruned_weights=False) -> Tensor"
+    "name": "quantized::embedding_bag_prepack(Tensor weight) -> __torch__.torch.classes.quantized.EmbeddingPackedParamsBase W_prepack"
+  },
+  {
+    "name": "quantized::embedding_bag_unpack(__torch__.torch.classes.quantized.EmbeddingPackedParamsBase W_prepack) -> Tensor W_origin"
+  },
+  {
+    "name": "quantized::embedding_byte(__torch__.torch.classes.quantized.EmbeddingPackedParamsBase weight, Tensor indices, bool pruned_weights=False) -> Tensor",
+    "category": "Transform"
   },
   {
     "name": "quantized::hardswish(Tensor input, float output_scale, int output_zero_point) -> Tensor",
@@ -7886,28 +8097,36 @@
     "name": "quantized_decomposed::dequantize_per_token(Tensor input, Tensor scales, Tensor zero_points, int quant_min, int quant_max, ScalarType dtype, ScalarType output_dtype) -> Tensor"
   },
   {
-    "name": "quantized_decomposed::embedding_4bit(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices) -> Tensor"
+    "name": "quantized_decomposed::embedding_4bit(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices) -> Tensor",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_4bit.dtype(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None) -> Tensor"
+    "name": "quantized_decomposed::embedding_4bit.dtype(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None) -> Tensor",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_4bit.out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, Tensor(a!) out) -> Tensor(a!)"
+    "name": "quantized_decomposed::embedding_4bit.out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, Tensor(a!) out) -> Tensor(a!)",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_4bit.dtype_out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)"
+    "name": "quantized_decomposed::embedding_4bit.dtype_out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_byte.dtype_out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)"
+    "name": "quantized_decomposed::embedding_byte.dtype_out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_byte(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices) -> Tensor"
+    "name": "quantized_decomposed::embedding_byte(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices) -> Tensor",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_byte.dtype(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None) -> Tensor"
+    "name": "quantized_decomposed::embedding_byte.dtype(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, ScalarType? dtype=None) -> Tensor",
+    "category": "Transform"
   },
   {
-    "name": "quantized_decomposed::embedding_byte.out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, Tensor(a!) out) -> Tensor(a!)"
+    "name": "quantized_decomposed::embedding_byte.out(Tensor weight, Tensor weight_scales, Tensor? weight_zero_points, int weight_quant_min, int weight_quant_max, Tensor indices, *, Tensor(a!) out) -> Tensor(a!)",
+    "category": "Transform"
   },
   {
     "name": "quantized_decomposed::fake_quant_per_channel(Tensor input, Tensor scales, Tensor zero_points, int axis, int quant_min, int quant_max) -> Tensor"

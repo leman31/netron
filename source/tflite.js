@@ -13,7 +13,7 @@ tflite.ModelFactory = class {
             return context.set('tflite.flatbuffers', reader);
         }
         const identifier = context.identifier;
-        const extension = identifier.split('.').pop().toLowerCase();
+        const extension = identifier.lastIndexOf('.') > 0 ? identifier.split('.').pop().toLowerCase() : '';
         if (extension === 'tflite' && reader && reader.identifier === '') {
             const version = reader.uint32_(reader.root, 4, 0);
             if (version === 3) {
@@ -362,7 +362,7 @@ tflite.Node = class {
                 for (const [name, value] of Object.entries(options)) {
                     if (name === 'fused_activation_function' && value) {
                         if (value < 1 || value > 5) {
-                            throw new tflite.Error(`Unsupported activation funtion index '${value}'.`);
+                            throw new tflite.Error(`Unsupported activation function index '${value}'.`);
                         }
                         const list = ['Unknown', 'Relu', 'ReluN1To1', 'Relu6', 'Tanh', 'SignBit'];
                         const type = list[value];

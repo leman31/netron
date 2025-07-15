@@ -11,7 +11,7 @@ tf.ModelFactory = class {
 
     async match(context) {
         const identifier = context.identifier;
-        const extension = identifier.split('.').pop().toLowerCase();
+        const extension = identifier.lastIndexOf('.') > 0 ? identifier.split('.').pop().toLowerCase() : '';
         if (extension === 'pbtxt' || extension === 'prototxt' || extension === 'pt' || extension === 'txt') {
             if (identifier.endsWith('predict_net.pbtxt') || identifier.endsWith('predict_net.prototxt') ||
                 identifier.endsWith('init_net.pbtxt') || identifier.endsWith('init_net.prototxt')) {
@@ -750,11 +750,25 @@ tf.Graph = class {
             metadata = new tf.GraphMetadata(metadata, graph.library);
             this.functions = metadata.functions;
             const context = new tf.Context();
+            const resolveTensorInfoName = (tensor) => {
+                if (tensor) {
+                    if (tensor.name) {
+                        return tensor.name;
+                    }
+                    if (tensor.coo_sparse && tensor.coo_sparse.values_tensor_name) {
+                        return tensor.coo_sparse.values_tensor_name;
+                    }
+                    if (tensor.composite_tensor && Array.isArray(tensor.composite_tensor.components) && tensor.composite_tensor.components.length > 0) {
+                        return resolveTensorInfoName(tensor.composite_tensor.components[0]);
+                    }
+                }
+                return '';
+            };
             for (const [key, signature_def] of Object.entries(meta_graph.signature_def)) {
                 const inputs = [];
                 for (const [key, tensor] of Object.entries(signature_def.inputs)) {
                     const type = new tf.TensorType(tensor.dtype, tensor.tensor_shape);
-                    const name = tensor.name.replace(/:0$/, '');
+                    const name = resolveTensorInfoName(tensor).replace(/:0$/, '');
                     const value = context.value(name, type);
                     const argument = new tf.Argument(key, [value]);
                     inputs.push(argument);
@@ -762,7 +776,7 @@ tf.Graph = class {
                 const outputs = [];
                 for (const [key, tensor] of Object.entries(signature_def.outputs)) {
                     const type = new tf.TensorType(tensor.dtype, tensor.tensor_shape);
-                    const name = tensor.name.replace(/:0$/, '');
+                    const name = resolveTensorInfoName(tensor).replace(/:0$/, '');
                     const value = context.value(name, type);
                     const argument = new tf.Argument(key, [value]);
                     outputs.push(argument);
@@ -1846,9 +1860,7 @@ tf.Context = class {
                 if (node.attr && node.attr.dtype && node.attr._output_shapes && node.attr._output_shapes.list && node.attr._output_shapes.list.shape) {
                     const tensor = new tf.proto.tensorflow.TensorProto();
                     tensor.dtype = node.attr.dtype.type;
-                    /* eslint-disable prefer-destructuring */
-                    tensor.tensor_shape = node.attr._output_shapes.list.shape[0];
-                    /* eslint-enable prefer-destructuring */
+                    [tensor.tensor_shape] = node.attr._output_shapes.list.shape;
                     const name = node.name;
                     const initializer = map_resource(name, node.input[0].from,  new tf.Tensor(tensor, name, 'Resource Variable'));
                     if (initializer) {

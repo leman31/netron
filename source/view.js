@@ -4,6 +4,7 @@ import * as grapher from './grapher.js';
 
 const view = {};
 const markdown = {};
+const metadata = {};
 const metrics = {};
 
 view.View = class {
@@ -19,7 +20,6 @@ view.View = class {
         };
         this._options = { ...this._defaultOptions };
         this._model = null;
-        this._metrics = new metrics.Metrics();
         this._stack = [];
         this._selection = [];
         this._sidebar = new view.Sidebar(this._host);
@@ -212,7 +212,7 @@ view.View = class {
                     execute: async () => await this._host.execute('about')
                 });
             }
-            this._select = new view.TargetSelector(this, this._element('toolbar-target-selector'));
+            this._select = new view.TargetSelector(this, this._element('toolbar-navigator'));
             this._select.on('change', (sender, target) => this._updateActiveTarget([target]));
             await this._host.start();
         } catch (error) {
@@ -286,10 +286,6 @@ view.View = class {
 
     get model() {
         return this._model;
-    }
-
-    get metrics() {
-        return this._metrics;
     }
 
     get options() {
@@ -596,7 +592,7 @@ view.View = class {
             for (const element of selection) {
                 const rect = element.getBoundingClientRect();
                 const width = Math.min(rect.width, bounds.width);
-                const height = Math.min(rect.width, bounds.height);
+                const height = Math.min(rect.height, bounds.height);
                 x += rect.left + (width / 2);
                 y += rect.top + (height / 2);
                 left = Math.min(left, rect.left);
@@ -651,33 +647,32 @@ view.View = class {
             this._sidebar.close();
         }
         this.exception(error, false);
+        const repository = this._host.environment('repository');
         const knowns = [
-            { message: /^Invalid value identifier/, url: 'https://github.com/lutzroeder/netron/issues/540' },
-            { message: /^Cannot read property/, url: 'https://github.com/lutzroeder/netron/issues/647' },
-            { message: /^Duplicate value /, url: 'https://github.com/lutzroeder/netron/issues/1364' },
-            { message: /^EPERM: operation not permitted/, url: 'https://github.com/lutzroeder/netron/issues/551' },
-            { message: /^EACCES: permission denied/, url: 'https://github.com/lutzroeder/netron/issues/504' },
-            { message: /^Offset is outside the bounds of the DataView/, url: 'https://github.com/lutzroeder/netron/issues/563' },
-            { message: /^Invalid string length/, url: 'https://github.com/lutzroeder/netron/issues/648' },
-            { message: /^Unknown function /, url: 'https://github.com/lutzroeder/netron/issues/546' },
-            { message: /^Unsupported file content/, url: 'https://github.com/lutzroeder/netron/issues/550' },
-            { message: /^Unsupported Protocol Buffers content/, url: 'https://github.com/lutzroeder/netron/issues/593' },
-            { message: /^Unsupported Protocol Buffers text content/, url: 'https://github.com/lutzroeder/netron/issues/594' },
-            { message: /^Unsupported JSON content/, url: 'https://github.com/lutzroeder/netron/issues/595' },
-            { message: /^Invalid file content. File contains PaddlePaddle IR data./, url: 'https://github.com/lutzroeder/netron/issues/1384' },
-            { name: 'Error loading PyTorch model.', message: /^Unknown type name/, url: 'https://github.com/lutzroeder/netron/issues/969' },
-            { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto \(Unexpected end of file\)\./, url: 'https://github.com/lutzroeder/netron/issues/1155' },
-            { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto \(Cannot read properties of undefined \(reading 'ModelProto'\)\)\./, url: 'https://github.com/lutzroeder/netron/issues/1156' },
-            { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto/, url: 'https://github.com/lutzroeder/netron/issues/549' }
+            { message: /^Invalid value identifier/, issue: '540' },
+            { message: /^Cannot read property/, issue: '647' },
+            { message: /^Duplicate value /, issue: '1364' },
+            { message: /^EPERM: operation not permitted/, issue: '551' },
+            { message: /^EACCES: permission denied/, issue: '504' },
+            { message: /^Offset is outside the bounds of the DataView/, issue: '563' },
+            { message: /^Invalid string length/, issue: '648' },
+            { message: /^Unknown function /, issue: '546' },
+            { message: /^Unsupported file content/, issue: '550' },
+            { message: /^Unsupported Protocol Buffers content/, issue: '593' },
+            { message: /^Unsupported Protocol Buffers text content/, issue: '594' },
+            { message: /^Unsupported JSON content/, issue: '595' },
+            { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto \(Unexpected end of file\)\./, issue: '1155' },
+            { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto \(Cannot read properties of undefined \(reading 'ModelProto'\)\)\./, issue: '1156' },
+            { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto/, issue: '549' }
         ];
         const known = knowns.find((known) => (!known.name || known.name === error.name) && error.message.match(known.message));
-        const url = known && known.url ? known.url : null;
+        const url = known && known.issue ? `${repository}/issues/${known.issue}` : `${repository}/issues`;
         const message = error.message;
         name = name || error.name;
-        const report = url ? true : false;
+        const report = !message.startsWith('Invalid file content.') && this.host.environment('packaged');
         await this._host.message(message, true, report ? 'Report' : 'OK');
         if (report) {
-            this._host.openURL(url || `${this._host.environment('repository')}/issues`);
+            this._host.openURL(url);
         }
         this.show(screen);
     }
@@ -721,8 +716,12 @@ view.View = class {
     }
 
     async attach(context) {
-        if (this._model && await this._metrics.open(context)) {
-            return true;
+        if (this._model) {
+            const attachment = new metadata.Attachment();
+            if (await attachment.open(context)) {
+                this._model.attachment = attachment;
+                return true;
+            }
         }
         return false;
     }
@@ -767,12 +766,16 @@ view.View = class {
         }
     }
 
-    async _updateStack(model, stack) {
+    update(model) {
         this._model = model;
+    }
+
+    async _updateStack(model, stack) {
+        this.update(model);
         this._stack = stack;
-        const status = await this.renderGraph(this._model, this.activeTarget, this.activeSignature, this._options);
+        const status = await this.renderGraph(model, this.activeTarget, this.activeSignature, this._options);
         if (status !== '') {
-            this._model = null;
+            this.update(null);
             this._stack = [];
             this._activeTarget = null;
         }
@@ -815,10 +818,13 @@ view.View = class {
                     }
                     if (name.length > 24) {
                         element.setAttribute('title', name);
-                        element.innerHTML = `&hellip;${name.substring(name.length - 24, name.length)}`;
+                        const truncated = name.substring(name.length - 24, name.length);
+                        element.innerHTML = '&hellip;';
+                        const text = document.createTextNode(truncated);
+                        element.appendChild(text);
                     } else {
                         element.removeAttribute('title');
-                        element.innerHTML = name;
+                        element.textContent = name;
                     }
                     path.appendChild(element);
                 }
@@ -839,7 +845,7 @@ view.View = class {
     async pushTarget(graph, context) {
         if (graph && graph !== this.activeTarget && Array.isArray(graph.nodes)) {
             this._sidebar.close();
-            if (context) {
+            if (context && this._stack.length > 0) {
                 this._stack[0].state = { context, zoom: this._zoom };
             }
             const signature = Array.isArray(graph.signatures) && graph.signatures.length > 0 ? graph.signatures[0] : null;
@@ -898,54 +904,57 @@ view.View = class {
                     elements.push(nodeElements[0]);
                 }
             }
-            const size = canvas.getBBox();
-            const margin = 100;
-            const width = Math.ceil(margin + size.width + margin);
-            const height = Math.ceil(margin + size.height + margin);
-            origin.setAttribute('transform', `translate(${margin - size.x}, ${margin - size.y}) scale(1)`);
-            background.setAttribute('width', width);
-            background.setAttribute('height', height);
-            this._width = width;
-            this._height = height;
-            delete this._scrollLeft;
-            delete this._scrollRight;
-            canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
-            canvas.setAttribute('width', width);
-            canvas.setAttribute('height', height);
-            this._zoom = this._stack && this._stack.length > 0 && this._stack[0].state ? this._stack[0].state.zoom : 1;
-            this._updateZoom(this._zoom);
-            const container = this._element('graph');
-            const context = this._stack && this._stack.length > 0 && this._stack[0].state ? viewGraph.select([this._stack[0].state.context]) : [];
-            if (context.length > 0) {
-                this.scrollTo(context, 'instant');
-            } else if (elements && elements.length > 0) {
-                // Center view based on input elements
-                const bounds = container.getBoundingClientRect();
-                const xs = [];
-                const ys = [];
-                for (let i = 0; i < elements.length; i++) {
-                    const element = elements[i];
-                    const rect = element.getBoundingClientRect();
-                    const width = Math.min(rect.width, bounds.width);
-                    const height = Math.min(rect.width, bounds.width);
-                    xs.push(rect.left + (width / 2));
-                    ys.push(rect.top + (height / 2));
+            this._host.window.requestAnimationFrame(() => {
+                const size = canvas.getBBox();
+                const margin = 100;
+                const width = Math.ceil(margin + size.width + margin);
+                const height = Math.ceil(margin + size.height + margin);
+                origin.setAttribute('transform', `translate(${margin - size.x}, ${margin - size.y}) scale(1)`);
+                background.setAttribute('width', width);
+                background.setAttribute('height', height);
+                this._width = width;
+                this._height = height;
+                delete this._scrollLeft;
+                delete this._scrollRight;
+                canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                canvas.setAttribute('width', width);
+                canvas.setAttribute('height', height);
+                const state = this._stack && this._stack.length > 0 && this._stack[0] && this._stack[0].state ? this._stack[0].state : null;
+                this._zoom = state ? state.zoom : 1;
+                this._updateZoom(this._zoom);
+                const container = this._element('graph');
+                const context = state ? viewGraph.select([state.context]) : [];
+                if (context.length > 0) {
+                    this.scrollTo(context, 'instant');
+                } else if (elements && elements.length > 0) {
+                    // Center view based on input elements
+                    const bounds = container.getBoundingClientRect();
+                    const xs = [];
+                    const ys = [];
+                    for (let i = 0; i < elements.length; i++) {
+                        const element = elements[i];
+                        const rect = element.getBoundingClientRect();
+                        const width = Math.min(rect.width, bounds.width);
+                        const height = Math.min(rect.width, bounds.width);
+                        xs.push(rect.left + (width / 2));
+                        ys.push(rect.top + (height / 2));
+                    }
+                    let [x] = xs;
+                    const [y] = ys;
+                    if (ys.every((y) => y === ys[0])) {
+                        x = xs.reduce((a, b) => a + b, 0) / xs.length;
+                    }
+                    const left = (container.scrollLeft + x - bounds.left) - (bounds.width / 2);
+                    const top = (container.scrollTop + y - bounds.top) - (bounds.height / 2);
+                    container.scrollTo({ left, top, behavior: 'auto' });
+                } else {
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const graphRect = container.getBoundingClientRect();
+                    const left = (container.scrollLeft + (canvasRect.width / 2) - graphRect.left) - (graphRect.width / 2);
+                    const top = (container.scrollTop + (canvasRect.height / 2) - graphRect.top) - (graphRect.height / 2);
+                    container.scrollTo({ left, top, behavior: 'auto' });
                 }
-                let [x] = xs;
-                const [y] = ys;
-                if (ys.every((y) => y === ys[0])) {
-                    x = xs.reduce((a, b) => a + b, 0) / xs.length;
-                }
-                const left = (container.scrollLeft + x - bounds.left) - (bounds.width / 2);
-                const top = (container.scrollTop + y - bounds.top) - (bounds.height / 2);
-                container.scrollTo({ left, top, behavior: 'auto' });
-            } else {
-                const canvasRect = canvas.getBoundingClientRect();
-                const graphRect = container.getBoundingClientRect();
-                const left = (container.scrollLeft + (canvasRect.width / 2) - graphRect.left) - (graphRect.width / 2);
-                const top = (container.scrollTop + (canvasRect.height / 2) - graphRect.top) - (graphRect.height / 2);
-                container.scrollTo({ left, top, behavior: 'auto' });
-            }
+            });
             this._graph = viewGraph;
         }
         return status;
@@ -1077,10 +1086,10 @@ view.View = class {
                 this._graph.blur([value]);
             });
             sidebar.on('select', (sender, value) => {
-                this.scrollTo(this._graph.activate(value));
+                this.scrollTo(this._graph.select([value]));
             });
             sidebar.on('activate', (sender, value) => {
-                this.scrollTo(this._graph.select([value]));
+                this.scrollTo(this._graph.activate(value));
             });
             sidebar.on('deactivate', () => {
                 this._graph.select(null);
@@ -1737,25 +1746,21 @@ view.Worker = class {
 
     constructor(host) {
         this._host = host;
-        const type = this._host.type;
-        this._browser = type === 'Browser' || type === 'Python';
-        if (this._browser) {
-            this._create();
-        }
+        this._timeout = -1;
+        this._create();
     }
 
     async request(message, delay, notification) {
-        this._timeout = -1;
+        this._cancel();
         return new Promise((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
-            if (!this._worker) {
-                this._create();
-            }
+            this._create();
             this._worker.postMessage(message);
             this._timeout = setTimeout(async () => {
                 await this._host.message(notification, null, 'Cancel');
-                this._cancel(true);
+                this._terminate();
+                this._cancel();
                 delete this._resolve;
                 delete this._reject;
                 resolve({ type: 'cancel' });
@@ -1764,34 +1769,43 @@ view.Worker = class {
     }
 
     _create() {
-        this._worker = this._host.worker('./worker');
-        this._worker.addEventListener('message', (e) => {
-            this._cancel(false);
-            const message = e.data;
-            if (this._reject && message.type === 'error') {
-                this._reject(new Error(message.message));
-            } else if (this._resolve) {
-                this._resolve(message);
-            }
-            delete this._resolve;
-            delete this._reject;
-        });
-        this._worker.addEventListener('error', (e) => {
-            this._cancel(true);
-            if (this._reject) {
-                this._reject(new Error(`Unknown worker error type '${e.type}'.`));
+        if (!this._worker) {
+            this._worker = this._host.worker('./worker');
+            this._worker.addEventListener('message', (e) => {
+                this._cancel();
+                const message = e.data;
+                const resolve = this._resolve;
+                const reject = this._reject;
                 delete this._resolve;
                 delete this._reject;
-            }
-        });
+                if (reject && message.type === 'error') {
+                    const error = new Error(`Worker: ${message.message}`);
+                    reject(error);
+                } else if (resolve) {
+                    resolve(message);
+                }
+            });
+            this._worker.addEventListener('error', (e) => {
+                this._terminate();
+                this._cancel();
+                const reject = this._reject;
+                delete this._resolve;
+                delete this._reject;
+                if (reject) {
+                    reject(new Error(`Unknown worker error type '${e.type}'.`));
+                }
+            });
+        }
     }
 
-    _cancel(terminate) {
-        terminate = terminate || !this._browser;
-        if (this._worker && terminate) {
+    _terminate() {
+        if (this._worker) {
             this._worker.terminate();
             this._worker = null;
         }
+    }
+
+    _cancel() {
         if (this._timeout >= 0) {
             clearTimeout(this._timeout);
             this._timeout = -1;
@@ -1965,8 +1979,10 @@ view.Graph = class extends grapher.Graph {
                 if (argument.visible !== false) {
                     const viewOutput = this.createOutput(argument);
                     this.setNode(viewOutput);
-                    for (const value of argument.value) {
-                        this.createValue(value).to.push(viewOutput);
+                    if (Array.isArray(argument.value)) {
+                        for (const value of argument.value) {
+                            this.createValue(value).to.push(viewOutput);
+                        }
                     }
                 }
             }
@@ -2301,14 +2317,16 @@ view.Output = class extends grapher.Node {
         super();
         this.context = context;
         this.value = value;
-        const types = value.value.map((argument) => argument.type || '').join('\n');
-        let name = value.name || '';
-        if (name.length > 16) {
-            name = name.split('/').pop();
+        if (Array.isArray(value.value)) {
+            const types = value.value.map((argument) => argument.type || '').join('\n');
+            let name = value.name || '';
+            if (name.length > 16) {
+                name = name.split('/').pop();
+            }
+            const header = this.header();
+            const title = header.add(null, ['graph-item-output'], name, types);
+            title.on('click', () => this.context.view.showTargetProperties());
         }
-        const header = this.header();
-        const title = header.add(null, ['graph-item-output'], name, types);
-        title.on('click', () => this.context.view.showTargetProperties());
     }
 
     get inputs() {
@@ -2667,7 +2685,8 @@ view.TargetSelector = class extends view.Control {
     constructor(context, element) {
         super(context);
         this._element = element;
-        this._element.addEventListener('change', (e) => {
+        [this._select] = element.getElementsByTagName('select');
+        this._select.addEventListener('change', (e) => {
             const target = this._targets[e.target.selectedIndex];
             this.emit('change', target);
         });
@@ -2675,8 +2694,8 @@ view.TargetSelector = class extends view.Control {
     }
 
     update(model, stack) {
-        while (this._element.firstChild) {
-            this._element.removeChild(this._element.firstChild);
+        while (this._select.firstChild) {
+            this._select.removeChild(this._select.firstChild);
         }
         this._targets = [];
         const current = stack.length > 0 ? stack[stack.length - 1] : null;
@@ -2684,7 +2703,7 @@ view.TargetSelector = class extends view.Control {
             if (targets.length > 0) {
                 const group = this.createElement('optgroup');
                 group.setAttribute('label', title);
-                this._element.appendChild(group);
+                this._select.appendChild(group);
                 for (let i = 0; i < targets.length; i++) {
                     const target = targets[i];
                     const option = this.createElement('option');
@@ -2692,7 +2711,7 @@ view.TargetSelector = class extends view.Control {
                     group.appendChild(option);
                     if (current && current.target === target.target && current.signature === target.signature) {
                         option.setAttribute('selected', 'true');
-                        this._element.setAttribute('title', target.name);
+                        this._select.setAttribute('title', target.name);
                     }
                     this._targets.push(target);
                 }
@@ -2701,21 +2720,23 @@ view.TargetSelector = class extends view.Control {
         const graphs = [];
         const signatures = [];
         const functions = [];
-        for (const graph of model.graphs) {
-            const name = graph.name || '(unnamed)';
-            graphs.push({ name, target: graph, signature: null });
-            if (Array.isArray(graph.functions)) {
-                for (const func of graph.functions) {
-                    functions.push({ name: `${name}.${func.name}`, target: func, signature: null });
+        if (model && Array.isArray(model.graphs)) {
+            for (const graph of model.graphs) {
+                const name = graph.name || '(unnamed)';
+                graphs.push({ name, target: graph, signature: null });
+                if (Array.isArray(graph.functions)) {
+                    for (const func of graph.functions) {
+                        functions.push({ name: `${name}.${func.name}`, target: func, signature: null });
+                    }
                 }
-            }
-            if (Array.isArray(graph.signatures)) {
-                for (const signature of graph.signatures) {
-                    signatures.push({ name: `${name}.${signature.name}`, target: graph, signature });
+                if (Array.isArray(graph.signatures)) {
+                    for (const signature of graph.signatures) {
+                        signatures.push({ name: `${name}.${signature.name}`, target: graph, signature });
+                    }
                 }
             }
         }
-        if (Array.isArray(model.functions)) {
+        if (model && Array.isArray(model.functions)) {
             for (const func of model.functions) {
                 functions.push({ name: func.name, target: func, signature: null });
             }
@@ -2767,13 +2788,19 @@ view.ObjectSidebar = class extends view.Control {
         });
         value.on('select', (sender, value) => this.emit('select', value));
         value.on('activate', (sender, value) => this.emit('activate', value));
+        value.on('deactivate', (sender, value) => this.emit('deactivate', value));
         this.addEntry(name, value);
+        return value;
     }
 
     error(error, fatal) {
         super.error(error, fatal);
         const element = this.createElement('span');
-        element.innerHTML = `<b>ERROR:</b> ${error.message}`;
+        const title = document.createElement('b');
+        title.textContent = 'ERROR: ';
+        element.appendChild(title);
+        const message = document.createTextNode(` ${error.message}`);
+        element.appendChild(message);
         this.element.appendChild(element);
     }
 };
@@ -2852,18 +2879,18 @@ view.NodeSidebar = class extends view.ObjectSidebar {
                 this.addArgument(name, output);
             }
         }
-        const metadata = node.metadata;
+        const metadata = this._view.model.attachment.metadata.node(node);
         if (Array.isArray(metadata) && metadata.length > 0) {
             this.addSection('Metadata');
             for (const argument of metadata) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
-        const metrics = this._view.metrics.node(node);
+        const metrics = this._view.model.attachment.metrics.node(node);
         if (Array.isArray(metrics) && metrics.length > 0) {
             this.addSection('Metrics');
             for (const argument of metrics) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
     }
@@ -2929,19 +2956,27 @@ view.TextView = class extends view.Control {
             for (const item of list) {
                 const line = this.createElement('div', className);
                 switch (style) {
-                    case 'code':
-                        line.innerHTML = `<code>${item}<code>`;
+                    case 'code': {
+                        const element = this.createElement('code');
+                        element.textContent = item;
+                        line.appendChild(element);
                         break;
-                    case 'bold':
-                        line.innerHTML = `<b>${item}<b>`;
+                    }
+                    case 'bold': {
+                        const element = this.createElement('b');
+                        element.textContent = item;
+                        line.appendChild(element);
                         break;
-                    case 'nowrap':
+                    }
+                    case 'nowrap': {
                         line.innerText = item;
                         line.style.whiteSpace = style;
                         break;
-                    default:
+                    }
+                    default: {
                         line.innerText = item;
                         break;
+                    }
                 }
                 this.element.appendChild(line);
                 className = 'sidebar-item-value-line-border';
@@ -3033,19 +3068,8 @@ view.ArgumentView = class extends view.Control {
     }
 
     toggle() {
-        if (this._source === 'attribute') {
-            if (this._expander.innerText === '+') {
-                this._expander.innerText = '-';
-            } else {
-                this._expander.innerText = '+';
-                while (this._element.childElementCount > 2) {
-                    this._element.removeChild(this._element.lastChild);
-                }
-            }
-        } else {
-            for (const item of this._items) {
-                item.toggle();
-            }
+        for (const item of this._items) {
+            item.toggle();
         }
     }
 };
@@ -3064,14 +3088,14 @@ view.PrimitiveView = class extends view.Expander {
             switch (type) {
                 case 'graph': {
                     const line = this.createElement('div', 'sidebar-item-value-line-link');
-                    line.innerHTML = value.name || '&nbsp;';
+                    line.textContent = value.name || '\u00A0';
                     line.addEventListener('click', () => this.emit('activate', value));
                     this.add(line);
                     break;
                 }
                 case 'function': {
                     const line = this.createElement('div', 'sidebar-item-value-line-link');
-                    line.innerHTML = value.type.name;
+                    line.textContent = value.type.name;
                     line.addEventListener('click', () => this.emit('activate', value));
                     this.add(line);
                     break;
@@ -3079,7 +3103,7 @@ view.PrimitiveView = class extends view.Expander {
                 case 'object[]': {
                     for (const obj of argument.value) {
                         const line = this.createElement('div', 'sidebar-item-value-line');
-                        line.innerHTML = obj.type.name;
+                        line.textContent = obj.type ? obj.type.name : '?';
                         this.add(line);
                     }
                     break;
@@ -3092,6 +3116,9 @@ view.PrimitiveView = class extends view.Expander {
                     }
                     if (content && typeof content === 'string') {
                         content = content.split('<').join('&lt;').split('>').join('&gt;');
+                    }
+                    if (content.indexOf('\n') >= 0) {
+                        content = content.split('\n').join('<br>');
                     }
                     const line = this.createElement('div', 'sidebar-item-value-line');
                     line.innerHTML = content ? content : '&nbsp;';
@@ -3374,7 +3401,11 @@ view.TensorView = class extends view.Expander {
     error(error, fatal) {
         super.error(error, fatal);
         const element = this.createElement('div', 'sidebar-item-value-line');
-        element.innerHTML = `<b>ERROR:</b> ${error.message}`;
+        const title = document.createElement('b');
+        title.textContent = 'ERROR: ';
+        element.appendChild(title);
+        const message = document.createTextNode(error.message);
+        element.appendChild(message);
         this.element.appendChild(element);
     }
 
@@ -3509,17 +3540,18 @@ view.ConnectionSidebar = class extends view.ObjectSidebar {
             this.addSection('Outputs');
             this.addNodeList('to', to);
         }
-        if (Array.isArray(value.metadata) && value.metadata.length > 0) {
+        const metadata = this._view.model.attachment.metadata.value(value);
+        if (Array.isArray(metadata) && metadata.length > 0) {
             this.addSection('Metadata');
-            for (const argument of value.metadata) {
-                this.addArgument(argument.name, argument);
+            for (const argument of metadata) {
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
-        const metrics = this._view.metrics.value(value);
+        const metrics = this._view.model.attachment.metrics.value(value);
         if (Array.isArray(metrics) && metrics.length > 0) {
             this.addSection('Metrics');
             for (const argument of metrics) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
     }
@@ -3588,7 +3620,7 @@ view.TensorSidebar = class extends view.ObjectSidebar {
                 const dataType = type.dataType;
                 this.addProperty('type', `${dataType}`, 'code');
                 const shape = type.shape && Array.isArray(type.shape.dimensions) ? type.shape.dimensions.toString(', ') : '?';
-                this.addProperty('shape', `${shape}`, 'code');
+                this.addProperty('shape', `${shape || '&nbsp;'}`, 'code');
                 const denotation = type.denotation;
                 if (denotation) {
                     this.addProperty('denotation', denotation, 'code');
@@ -3608,11 +3640,11 @@ view.TensorSidebar = class extends view.ObjectSidebar {
             }
             const value = new view.TensorView(this._view, tensor, this._tensor);
             this.addEntry('value', value);
-            const metadata = tensor.metadata;
+            const metadata = this._view.model.attachment.metadata.tensor(tensor);
             if (Array.isArray(metadata) && metadata.length > 0) {
                 this.addSection('Metadata');
-                for (const argument of tensor.metadata) {
-                    this.addArgument(argument.name, argument);
+                for (const argument of metadata) {
+                    this.addArgument(argument.name, argument, 'attribute');
                 }
             }
         }
@@ -3625,13 +3657,14 @@ view.TensorSidebar = class extends view.ObjectSidebar {
                 if (!this._tensor.empty) {
                     if (!this._metrics) {
                         const tensor = new metrics.Tensor(this._tensor);
-                        this._metrics = this._view.metrics.tensor(tensor);
+                        this._metrics = this._view.model.attachment.metrics.tensor(tensor);
                     }
                     if (this._metrics.length > 0) {
                         this.addSection('Metrics');
                         for (const metric of this._metrics) {
                             const value = metric.type === 'percentage' ? `${(metric.value * 100).toFixed(1)}%` : metric.value;
-                            this.addProperty(metric.name, [value]);
+                            const argument = new metadata.Argument(metric.name, value, metric.type);
+                            this.addArgument(metric.name, argument, 'attribute');
                         }
                     }
                 }
@@ -3688,20 +3721,25 @@ view.ModelSidebar = class extends view.ObjectSidebar {
         if (model.source) {
             this.addProperty('source', model.source);
         }
-        const metadata = model.metadata;
+        const metadata = this._view.model.attachment.metadata.model(model);
         if (Array.isArray(metadata) && metadata.length > 0) {
             this.addSection('Metadata');
             for (const argument of metadata) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
-        const metrics = this._view.metrics.model(model);
+        const metrics = this.metrics;
         if (Array.isArray(metrics) && metrics.length > 0) {
             this.addSection('Metrics');
             for (const argument of metrics) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
+    }
+
+    get metrics() {
+        const model = new metrics.Model(this._model);
+        return this._view.model.attachment.metrics.model(model);
     }
 };
 
@@ -3754,35 +3792,35 @@ view.TargetSidebar = class extends view.ObjectSidebar {
                 this.addArgument(output.name, output);
             }
         }
-        const metadata = target.metadata;
+        const metadata = this._view.model.attachment.metadata.graph(target);
         if (Array.isArray(metadata) && metadata.length > 0) {
             this.addSection('Metadata');
             for (const argument of metadata) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
-        const metrics = this._view.metrics.graph(target);
+        const metrics = this.metrics;
         if (Array.isArray(metrics) && metrics.length > 0) {
             this.addSection('Metrics');
             for (const argument of metrics) {
-                this.addArgument(argument.name, argument);
+                this.addArgument(argument.name, argument, 'attribute');
             }
         }
+    }
+
+    get metrics() {
+        const target = new metrics.Target(this._target);
+        return this._view.model.attachment.metrics.graph(target);
     }
 
     get identifier() {
         return 'target';
     }
 
-    addArgument(name, argument) {
-        const value = new view.ArgumentView(this._view, argument);
-        value.on('focus', (sender, value) => this.emit('focus', value));
-        value.on('blur', (sender, value) => this.emit('blur', value));
-        value.on('activate', (sender, value) => this.emit('activate', value));
-        value.on('deactivate', (sender, value) => this.emit('deactivate', value));
-        value.on('select', (sender, value) => this.emit('select', value));
+    addArgument(name, argument, source) {
+        const value = super.addArgument(name, argument, source);
         value.toggle();
-        this.addEntry(name, value);
+        return value;
     }
 };
 
@@ -3881,7 +3919,11 @@ view.DocumentationSidebar = class extends view.Control {
     error(error, fatal) {
         super.error(error, fatal);
         const element = this.createElement('span');
-        element.innerHTML = `<b>ERROR:</b> ${error.message}`;
+        const title = document.createElement('b');
+        title.textContent = 'ERROR: ';
+        element.appendChild(title);
+        const message = document.createTextNode(error.message);
+        element.appendChild(message);
         this.element.appendChild(element);
     }
 };
@@ -4193,7 +4235,11 @@ view.FindSidebar = class extends view.Control {
     error(error, fatal) {
         super.error(error, fatal);
         const element = this.createElement('li');
-        element.innerHTML = `<b>ERROR:</b> ${error.message}`;
+        const title = document.createElement('b');
+        title.textContent = 'ERROR: ';
+        element.appendChild(title);
+        const message = document.createTextNode(` ${error.message}`);
+        element.appendChild(message);
         this._content.appendChild(element);
     }
 };
@@ -4372,7 +4418,7 @@ view.Documentation = class {
                         target.typeAttr = source.typeAttr;
                     }
                     if (source.typeListAttr !== undefined) {
-                        target.typeListAttr = source.typeAttr;
+                        target.typeListAttr = source.typeListAttr;
                     }
                     if (source.numberAttr !== undefined) {
                         target.numberAttr = source.numberAttr;
@@ -5322,27 +5368,21 @@ markdown.Generator = class {
     }
 };
 
-metrics.Metrics = class {
+metadata.Attachment = class {
 
     constructor() {
-        this._metrics = new Map();
+        this.metadata = new metadata.Attachment.Container('metadata');
+        this.metrics = new metadata.Attachment.Container('metrics');
     }
 
     async open(context) {
-        const content = new view.Context(context);
-        if (content.identifier.toLowerCase().endsWith('.metrics.json')) {
-            const data = await content.peek('json');
-            if (data && data.signature === 'metrics' && Array.isArray(data.metrics)) {
-                this._metrics.clear();
-                for (const metric of data.metrics) {
-                    if (metric.kind && ('target' in metric || 'identifier' in metric)) {
-                        const key = 'target' in metric ? `${metric.kind}::${metric.target}` : `${metric.kind}[${metric.identifier}]`;
-                        if (!this._metrics.has(key)) {
-                            this._metrics.set(key, new Map());
-                        }
-                        const entries = this._metrics.get(key);
-                        entries.set(metric.name, { value: metric.value, type: metric.type });
-                    }
+        context = new view.Context(context);
+        if (context.identifier.toLowerCase().endsWith('.json')) {
+            const data = await context.peek('json');
+            if (data && data.signature === 'netron:attachment') {
+                const containers = [this.metadata, this.metrics];
+                for (const container of containers) {
+                    container.open(data[container.name]);
                 }
                 return true;
             }
@@ -5350,45 +5390,163 @@ metrics.Metrics = class {
         return false;
     }
 
-    metrics(entries, kind, value) {
-        const result = new Map(entries.map((metric) => [metric.name, metric]));
-        const name = value.identifier === undefined ? `::${(value.name || '').split('\n').shift()}` : `[${value.identifier}]`;
-        const key = `${kind}${name}`;
-        if (this._metrics.has(key)) {
-            for (const [name, metric] of this._metrics.get(key)) {
-                result.set(name, new metrics.Argument(name, metric.value, metric.type || 'attribute'));
+};
+
+metadata.Attachment.Container = class {
+
+    constructor(name) {
+        this._name = name;
+        this._entries = new Map();
+    }
+
+    get name() {
+        return this._name;
+    }
+
+    open(data) {
+        this._entries.clear();
+        if (Array.isArray(data)) {
+            for (const item of data) {
+                if (item.kind && ('target' in item || 'identifier' in item)) {
+                    const key = 'target' in item ? `${item.kind}::${item.target}` : `${item.kind}[${item.identifier}]`;
+                    if (!this._entries.has(key)) {
+                        this._entries.set(key, new Map());
+                    }
+                    const entries = this._entries.get(key);
+                    entries.set(item.name, { value: item.value, type: item.type });
+                }
+            }
+        }
+    }
+
+    model(value) {
+        return this._list(value, 'model');
+    }
+
+    graph(value) {
+        return this._list(value, 'graph');
+    }
+
+    node(value) {
+        return this._list(value, 'node');
+    }
+
+    value(value) {
+        return this._list(value, 'value');
+    }
+
+    tensor(value) {
+        return this._list(value, 'tensor');
+    }
+
+    _list(value, kind) {
+        const category = this._name;
+        const entries = value[category] || [];
+        const result = new Map(entries.map((entry) => [entry.name, entry]));
+        if (value.name || kind === 'model' || kind === 'graph') {
+            const key = `${kind}::${(value.name || '').split('\n').shift()}`;
+            if (this._entries.has(key)) {
+                for (const [name, entry] of this._entries.get(key)) {
+                    const argument = new metadata.Argument(name, entry.value, entry.type || 'attribute');
+                    result.set(name, argument);
+                }
+            }
+        }
+        if (value.identifier) {
+            const key = `${kind}[${value.identifier}]`;
+            if (this._entries.has(key)) {
+                for (const [name, entry] of this._entries.get(key)) {
+                    const argument = new metadata.Argument(name, entry.value, entry.type || 'attribute');
+                    result.set(name, argument);
+                }
             }
         }
         return Array.from(result.values());
     }
-
-    model(value) {
-        return this.metrics(value.metrics || [], 'model', '');
-    }
-
-    graph(value) {
-        return this.metrics(value.metrics || [], 'graph', value);
-    }
-
-    node(value) {
-        return this.metrics(value.metrics || [], 'node', value);
-    }
-
-    value(value) {
-        return this.metrics(value.metrics || [], 'value', value);
-    }
-
-    tensor(value) {
-        return this.metrics(value.metrics || [], 'tensor', value);
-    }
 };
 
-metrics.Argument = class {
+metadata.Argument = class {
 
     constructor(name, value, type) {
         this.name = name;
         this.value = value;
         this.type = type;
+    }
+};
+
+metrics.Model = class {
+
+    constructor(model) {
+        this._model = model;
+        this._metrics = null;
+    }
+
+    get metrics() {
+        if (this._metrics === null) {
+            this._metrics = [];
+            this._metrics = Array.from(this._model.metrics || []);
+            const keys = new Set(this._metrics.map((metric) => metric.name));
+            if (!keys.has('parameters')) {
+                let parameters = 0;
+                for (const graph of this._model.graphs || []) {
+                    const map = new Map((new metrics.Target(graph).metrics || []).map((metric) => [metric.name, metric]));
+                    parameters = map.has('parameters') ? parameters + map.get('parameters').value : NaN;
+                }
+                for (const func of this._model.functions || []) {
+                    const map = new Map((new metrics.Target(func).metrics || []).map((metric) => [metric.name, metric]));
+                    parameters = map.has('parameters') ? parameters + map.get('parameters').value : NaN;
+                }
+                if (!Number.isNaN(parameters) && parameters > 0) {
+                    this._metrics.push(new metadata.Argument('parameters', parameters, 'attribute'));
+                }
+            }
+        }
+        return this._metrics;
+    }
+};
+
+metrics.Target = class {
+
+    constructor(target) {
+        this._target = target;
+        this._metrics = null;
+    }
+
+    get metrics() {
+        if (this._metrics === null) {
+            this._metrics = [];
+            this._metrics = Array.from(this._target.metrics || []);
+            const keys = new Set(this._metrics.map((metrics) => metrics.name));
+            if (!keys.has('parameters')) {
+                let parameters = 0;
+                const initializers = new Set();
+                if (this._target && Array.isArray(this._target.nodes)) {
+                    for (const node of this._target.nodes) {
+                        for (const argument of node.inputs) {
+                            if (argument && Array.isArray(argument.value)) {
+                                for (const value of argument.value) {
+                                    if (value && value.initializer) {
+                                        initializers.add(value.initializer);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                for (const tensor of initializers) {
+                    const shape = tensor && tensor.type && tensor.type.shape && Array.isArray(tensor.type.shape.dimensions) ? tensor.type.shape.dimensions : [];
+                    if (!shape.every((dim) => typeof dim === 'number')) {
+                        parameters = 0;
+                        break;
+                    }
+                    parameters += shape.reduce((a, b) => a * b, 1);
+                }
+                if (parameters > 0) {
+                    this._metrics.push(new metadata.Argument('parameters', parameters, 'attribute'));
+                }
+            }
+        }
+        return this._metrics;
     }
 };
 
@@ -5437,13 +5595,13 @@ metrics.Tensor = class {
                 }
                 const mean = sum / count;
                 if (!keys.has('sparsity')) {
-                    this._metrics.push(new metrics.Argument('min', min, type.dataType));
+                    this._metrics.push(new metadata.Argument('min', min, type.dataType));
                 }
                 if (!keys.has('max')) {
-                    this._metrics.push(new metrics.Argument('max', max, type.dataType));
+                    this._metrics.push(new metadata.Argument('max', max, type.dataType));
                 }
                 if (!keys.has('mean')) {
-                    this._metrics.push(new metrics.Argument('mean', mean, type.dataType));
+                    this._metrics.push(new metadata.Argument('mean', mean, type.dataType));
                 }
                 if (!keys.has('std')) {
                     let variance = 0;
@@ -5458,10 +5616,10 @@ metrics.Tensor = class {
                             variance += Math.pow(data - mean, 2);
                         }
                     }
-                    this._metrics.push(new metrics.Argument('std', Math.sqrt(variance / count)));
+                    this._metrics.push(new metadata.Argument('std', Math.sqrt(variance / count)));
                 }
                 if (!keys.has('sparsity')) {
-                    this._metrics.push(new metrics.Argument('sparsity', count > 0 ? zeros / count : 0, 'percentage'));
+                    this._metrics.push(new metadata.Argument('sparsity', count > 0 ? zeros / count : 0, 'percentage'));
                 }
             }
         }
@@ -5488,6 +5646,13 @@ view.Context = class {
 
     get stream() {
         return this._stream;
+    }
+
+    get container() {
+        if (this._context instanceof view.EntryContext) {
+            return this._context;
+        }
+        return null;
     }
 
     async request(file) {
@@ -5528,7 +5693,7 @@ view.Context = class {
                 const buffer = stream.peek(Math.min(stream.length, 16));
                 const skip =
                     match(buffer, [0x80, undefined, 0x8a, 0x0a, 0x6c, 0xfc, 0x9c, 0x46, 0xf9, 0x20, 0x6a, 0xa8, 0x50, 0x19]) || // PyTorch
-                    (type !== 'npz' && type !== 'zip' && match(buffer, [0x50, 0x4B, 0x03, 0x04])) || // Zip
+                    (type !== 'npz' && type !== 'zip' && match(buffer, [0x50, 0x4B, 0x03, 0x04])) || // ZIP
                     (type !== 'hdf5' && match(buffer, [0x89, 0x48, 0x44, 0x46, 0x0D, 0x0A, 0x1A, 0x0A])) || // \x89HDF\r\n\x1A\n
                     Array.from(this._tags).some(([key, value]) => key !== 'flatbuffers' && key !== 'xml' && value.size > 0) ||
                     Array.from(this._content.values()).some((obj) => obj !== undefined);
@@ -5590,8 +5755,8 @@ view.Context = class {
                                 const archive = zip.Archive.open(stream, 'zlib');
                                 const data = archive ? archive.entries.get('') : stream;
                                 let condition = false;
-                                if (data.length > 2) {
-                                    const head = data.peek(2);
+                                if (data.length > 4) {
+                                    const head = data.peek(4);
                                     condition = head[0] === 0x80 && head[1] < 7;
                                     if (!condition) {
                                         data.seek(-1);
@@ -5600,16 +5765,21 @@ view.Context = class {
                                         if (tail[0] === 0x2e) {
                                             const size = Math.min(data.length, 256);
                                             const buffer = data.peek(size);
-                                            const content = String.fromCharCode.apply(null, buffer);
-                                            const list = ['ccopy_reg', 'cnumpy.core.multiarray', '(dp0'];
-                                            condition = list.some((value) => content.indexOf(value) !== -1);
+                                            condition =
+                                                (buffer[0] === 0x28 && buffer[1] === 0x64 && buffer[2] === 0x70) ||
+                                                (buffer[0] === 0x28 && buffer[1] === 0x63 && buffer.indexOf(0x0a) !== -1);
+                                            if (!condition) {
+                                                const content = String.fromCharCode.apply(null, buffer);
+                                                const list = ['ccopy_reg', 'cnumpy.core.multiarray', '(dp0'];
+                                                condition = list.some((value) => content.indexOf(value) !== -1);
+                                            }
                                         }
                                     }
                                 }
                                 if (condition) {
                                     const python = await import('./python.js');
                                     const execution = new python.Execution();
-                                    execution.on('resolve', (_, name) => types.add(name));
+                                    execution.on('resolve', (sender, name) => types.add(name));
                                     const pickle = execution.__import__('pickle');
                                     unpickler = new pickle.Unpickler(data);
                                 }
@@ -5841,8 +6011,8 @@ view.Context = class {
                 const signatures = [
                     [0x89, 0x48, 0x44, 0x46, 0x0D, 0x0A, 0x1A, 0x0A], // HDF5
                     [0x80, undefined, 0x8a, 0x0a, 0x6c, 0xfc, 0x9c, 0x46, 0xf9, 0x20, 0x6a, 0xa8, 0x50, 0x19], // PyTorch
-                    [0x50, 0x4b], // Zip
-                    [0x1f, 0x8b] // Gzip
+                    [0x50, 0x4b], // ZIP
+                    [0x1f, 0x8b] // gzip
                 ];
                 let skip = false;
                 if (signatures.some((signature) => signature.length <= stream.length && stream.peek(signature.length).every((value, index) => signature[index] === undefined || signature[index] === value))) {
@@ -5945,6 +6115,10 @@ view.EntryContext = class {
         return this._host.require(id);
     }
 
+    get entries() {
+        return this._entries;
+    }
+
     error(error, fatal) {
         this._host.exception(error, fatal);
     }
@@ -5966,8 +6140,8 @@ view.ModelFactoryService = class {
         this._factories = [];
         /* eslint-disable no-control-regex */
         this.register('./message', ['.message', '.netron', '.maxviz']);
-        this.register('./pytorch', ['.pt', '.pth', '.ptl', '.pt1', '.pt2', '.pyt', '.pyth', '.pkl', '.pickle', '.h5', '.t7', '.model', '.dms', '.tar', '.ckpt', '.chkpt', '.tckpt', '.bin', '.pb', '.zip', '.nn', '.torchmodel', '.torchscript', '.pytorch', '.ot', '.params', '.trt', '.ff', '.ptmf', '.jit', '.bin.index.json', 'model.json', '.ir', 'serialized_exported_program.json', 'serialized_state_dict.json'], ['.model', '.pt2'], [/^\x80.\x8a\x0a\x6c\xfc\x9c\x46\xf9\x20\x6a\xa8\x50\x19/]);
-        this.register('./onnx', ['.onnx', '.onnx.data', '.onn', '.pb', '.onnxtxt', '.pbtxt', '.prototxt', '.txt', '.model', '.pt', '.pth', '.pkl', '.ort', '.ort.onnx', '.ngf', '.json', '.bin', 'onnxmodel'], [], [/^....ORTM/]);
+        this.register('./pytorch', ['.pt', '.pth', '.ptl', '.pt1', '.pt2', '.pyt', '.pyth', '.pkl', '.pickle', '.h5', '.t7', '.model', '.dms', '.tar', '.ckpt', '.chkpt', '.tckpt', '.bin', '.pb', '.zip', '.nn', '.torchmodel', '.torchscript', '.pytorch', '.ot', '.params', '.trt', '.ff', '.ptmf', '.jit', '.bin.index.json', 'model.json', '.ir', 'serialized_exported_program.json', 'serialized_state_dict.json', 'archive_format'], ['.model', '.pt2'], [/^\x80.\x8a\x0a\x6c\xfc\x9c\x46\xf9\x20\x6a\xa8\x50\x19/]);
+        this.register('./onnx', ['.onnx', '.onnx.data', '.onn', '.pb', '.onnxtxt', '.pbtxt', '.prototxt', '.txt', '.model', '.pt', '.pth', '.pkl', '.ort', '.ort.onnx', '.ngf', '.json', '.bin', 'onnxmodel'], [], [/^\x08[\x00-\x10]\x12[\x00-\x20]\w\w/, /^\x08[\x00-\x10]\x12\x00\x1A/, /^\x08[\x00-\x10]\x3A/, /^\s*ir_version:\s\d+/, /^....ORTM/]);
         this.register('./tflite', ['.tflite', '.lite', '.tfl', '.bin', '.pb', '.tmfile', '.h5', '.model', '.json', '.txt', '.dat', '.nb', '.ckpt', '.onnx'], [], [/^....TFL3/]);
         this.register('./mxnet', ['.json', '.params'], ['.mar']);
         this.register('./coreml', ['.mlmodel', '.bin', 'manifest.json', 'metadata.json', 'featuredescriptions.json', '.pb', '.pbtxt', '.mil'], ['.mlpackage', '.mlmodelc']);
@@ -6011,7 +6185,7 @@ view.ModelFactoryService = class {
         this.register('./imgdnn', ['.dnn', 'params', '.json']);
         this.register('./flax', ['.msgpack']);
         this.register('./om', ['.om', '.onnx', '.pb', '.engine', '.bin'], [], [/^IMOD/, /^PICO/]);
-        this.register('./gguf', ['.gguf', /^[^.]+$/]);
+        this.register('./gguf', ['.gguf', /^[^.]+$/], [], [/^GGUF/]);
         this.register('./nnabla', ['.nntxt'], ['.nnp']);
         this.register('./hickle', ['.h5', '.hkl']);
         this.register('./nnef', ['.nnef', '.dat']);
@@ -6025,8 +6199,9 @@ view.ModelFactoryService = class {
         this.register('./dot', ['.dot'], [], [/^\s*(\/\*[\s\S]*?\*\/|\/\/.*|#.*)?\s*digraph\s*([A-Za-z][A-Za-z0-9-_]*|".*?")?\s*{/m]);
         this.register('./catboost', ['.cbm']);
         this.register('./weka', ['.model']);
-        this.register('./qnn', ['.json', '.bin', '.serialized']);
+        this.register('./qnn', ['.json', '.bin', '.serialized', '.dlc']);
         this.register('./kann', ['.kann', '.bin', '.kgraph'], [], [/^....KaNN/]);
+        this.register('./xgboost', ['.xgb', '.xgboost', '.json', '.model', '.bin', '.txt'], [], [/^{L\x00\x00/, /^binf/, /^bs64/, /^\s*booster\[0\]:/]);
         this.register('', ['.cambricon', '.vnnmodel', '.nnc']);
         /* eslint-enable no-control-regex */
     }
@@ -6077,7 +6252,27 @@ view.ModelFactoryService = class {
             }
             return model;
         } catch (error) {
-            error.context = !error.context && context && context.identifier ? context.identifier : error.context || '';
+            if (!error.context && context) {
+                error.context = context.identifier || '';
+                const stream = context.stream;
+                if (stream) {
+                    try {
+                        const hex = (buffer) => Array.from(buffer).map((c) => (c < 16 ? '0' : '') + c.toString(16)).join('');
+                        const position = stream.position;
+                        stream.seek(0);
+                        const head = stream.peek(Math.min(16, stream.length));
+                        error.context += `|${hex(head)}`;
+                        if (stream.length > 16) {
+                            stream.seek(stream.length - 16);
+                            const tail = stream.peek(16);
+                            error.context += `|${hex(tail)}`;
+                        }
+                        stream.seek(position);
+                    } catch {
+                        // continue regardless of error
+                    }
+                }
+            }
             throw error;
         }
     }
@@ -6151,6 +6346,11 @@ view.ModelFactoryService = class {
                     { name: 'Kaggle credentials', tags: ['username','key'] },
                     { name: '.NET runtime configuration', tags: ['runtimeOptions.configProperties'] },
                     { name: '.NET dependency manifest', tags: ['runtimeTarget', 'targets', 'libraries'] },
+                    { name: 'GuitarML NeuralPi model data', tags: ['model_data', 'state_dict'] },
+                    { name: 'GuitarML SmartAmpPro model data', tags: ['conv1d', 'conv1d_stride'] },
+                    { name: 'GuitarML SmartAmp model data', tags: ['activation', 'output_channels', 'input_channels', 'residual_channels'] },
+                    { name: 'Keras configuration data', tags: ['floatx', 'epsilon', 'backend'] },
+                    { name: 'PIMCOMP-NN model data', tags: ['node_list', 'reshape_info'] },
                 ];
                 const match = (obj, tag) => {
                     if (tag.startsWith('[].')) {
@@ -6220,8 +6420,8 @@ view.ModelFactoryService = class {
             const tags = await context.tags('pb+');
             if (Object.keys(tags).length > 0) {
                 const formats = [
-                    { name: 'sentencepiece.ModelProto data', tags: [[1,[[1,2],[2,5],[3,0]]],[2,[[1,2],[2,2],[3,0],[4,0],[5,2],[6,0],[7,2],[10,5],[16,0],[40,0],[41,0],[42,0],[43,0]]],[3,[]],[4,[]],[5,[]]] },
-                    { name: 'mediapipe.BoxDetectorIndex data', tags: [[1,[[1,[[1,[[1,5],[2,5],[3,5],[4,5],[6,0],[7,5],[8,5],[10,5],[11,0],[12,0]]],[2,5],[3,[]]]],[2,false],[3,false],[4,false],[5,false]]],[2,false],[3,false]] },
+                    { name: 'sentencepiece.ModelProto data', tags: [[1,[[1,2],[2,5],[3,0]]],[2,[[1,2],[2,2],[3,0],[4,0],[5,2],[6,0],[7,2],[10,5],[16,0],[40,0],[41,0],[42,0],[43,0]]],[3,[]],[4,[]],[5,[]]] }, // https://github.com/google/sentencepiece/blob/master/src/sentencepiece_model.proto
+                    { name: 'mediapipe.BoxDetectorIndex data', tags: [[1,[[1,[[1,[[1,5],[2,5],[3,5],[4,5],[6,0],[7,5],[8,5],[10,5],[11,0],[12,0]]],[2,5],[3,[]]]],[2,false],[3,false],[4,false],[5,false]]],[2,false],[3,false]] }, // https://github.com/google-ai-edge/mediapipe/blob/2b5a50fff37f79db8103dbd88f552c1a9be31e51/mediapipe/util/tracking/box_detector.proto
                     { name: 'third_party.tensorflow.python.keras.protobuf.SavedMetadata data', tags: [[1,[[1,[[1,0],[2,0]]],[2,0],[3,2],[4,2],[5,2]]]] },
                     { name: 'pblczero.Net data', tags: [[1,5],[2,2],[3,[[1,0],[2,0],[3,0]],[10,[[1,[]],[2,[]],[3,[]],[4,[]],[5,[]],[6,[]]]],[11,[]]]] }, // https://github.com/LeelaChessZero/lczero-common/blob/master/proto/net.proto
                     { name: 'chrome_browser_media.PreloadedData', tags: [[1,2]], identifier: 'preloaded_data.pb' }, // https://github.com/kiwibrowser/src/blob/86afd150b847c9dd6f9ad3faddee1a28b8c9b23b/chrome/browser/media/media_engagement_preload.proto#L9
@@ -6229,8 +6429,7 @@ view.ModelFactoryService = class {
                     { name: 'mindspore.irpb.Checkpoint', tags: [[1,[[1,2],[2,[[1,0],[2,2],[3,2]]]]]] }, // https://github.com/mindspore-ai/mindspore/blob/master/mindspore/ccsrc/utils/checkpoint.proto
                     { name: 'optimization_guide.proto.PageTopicsOverrideList data', tags: [[1,[[1,2],[2,[]]]]] }, // https://github.com/chromium/chromium/blob/main/components/optimization_guide/proto/page_topics_override_list.proto
                     { name: 'optimization_guide.proto.ModelInfo data', tags: [[1,0],[2,0],[4,0],[6,false],[7,[]],[9,0]] }, // https://github.com/chromium/chromium/blob/22b0d711657b451b61d50dd2e242b3c6e38e6ef5/components/optimization_guide/proto/models.proto#L80
-                    { name: 'Hobot Dnn data', tags: [[1,0],[2,0],[4,[[1,2],[2,2]]]] }, // https://github.com/HorizonRDK/hobot_dnn
-                    { name: 'Hobot Dnn data', tags: [[1,0],[2,0],[6,[1,[[1,2],[2,2]]]]] }, // https://github.com/HorizonRDK/hobot_dnn
+                    { name: 'Horizon binary model', tags: [[1,0],[2,0],[5,[[7,2],[8,2]]],[6,[[1,[[1,2],[2,2]]]]]] }, // https://github.com/HorizonRDK/hobot_dnn
                 ];
                 const match = (tags, schema) => {
                     for (const [key, inner] of schema) {
@@ -6268,7 +6467,8 @@ view.ModelFactoryService = class {
                     return content.join(',');
                 };
                 const content = format(tags);
-                throw new view.Error(`Unsupported Protocol Buffers content '${content.length > 64 ? `${content.substring(0, 100)}...` : content}'.`);
+                const message = content.length > 64 ? `${content.substring(0, 100)}...` : content;
+                throw new view.Error(`Unsupported Protocol Buffers content or ambiguous file extension '${message}'.`);
             }
         };
         const flatbuffers = async () => {
@@ -6280,8 +6480,7 @@ view.ModelFactoryService = class {
                     identifier = reader.identifier;
                 } else {
                     const data = stream.peek(8);
-                    if (data[0] >= 8 && data[0] <= 0x28 && (data[0] & 3) === 0 &&
-                        data[1] === 0x00 && data[2] === 0x00 && data[2] === 0x00) {
+                    if (data[0] >= 8 && data[0] <= 0x28 && (data[0] & 3) === 0 && data[1] === 0x00 && data[2] === 0x00 && data[3] === 0x00) {
                         identifier = String.fromCharCode.apply(null, data.slice(4, 8));
                     }
                 }
@@ -6297,8 +6496,10 @@ view.ModelFactoryService = class {
                         { name: 'MindSpore Lite model data', identifier: 'MSL1' },
                         { name: 'MindSpore Lite model data', identifier: 'MSL2' },
                         { name: 'MindSpore Lite model data', identifier: 'MSL3' },
+                        { name: 'NVDA model data', identifier: 'NVDA' },
                         { name: 'BSTM model data', identifier: 'BSTM' },
-                        { name: 'onnu model data', identifier: 'onnu' }
+                        { name: 'onnu model data', identifier: 'onnu' },
+                        { name: 'ONNX Runtime On-Device Training Checkpoint', identifier: 'ODTC' }
                     ];
                     for (const format of formats) {
                         if (identifier === format.identifier) {
@@ -6350,10 +6551,7 @@ view.ModelFactoryService = class {
         };
         const unknown = async () => {
             if (stream) {
-                stream.seek(0);
-                const buffer = stream.peek(Math.min(16, stream.length));
-                const content = Array.from(buffer).map((c) => (c < 16 ? '0' : '') + c.toString(16)).join('');
-                throw new view.Error(`Unsupported file content '${content}'.`);
+                throw new view.Error(`Unsupported file content.`);
             }
             throw new view.Error("Unsupported file directory.");
         };
@@ -6393,6 +6591,7 @@ view.ModelFactoryService = class {
                     if (!model.identifier) {
                         model.identifier = context.identifier;
                     }
+                    model.attachment = new metadata.Attachment();
                     return model;
                 } catch (error) {
                     delete context.type;
@@ -6537,46 +6736,47 @@ view.ModelFactoryService = class {
             }
             /* eslint-disable no-control-regex */
             const entries = [
-                { name: 'ELF executable', value: /^\x7FELF/ },
-                { name: 'PNG image', value: /^\x89PNG/ },
-                { name: 'Git LFS header', value: /^version https:\/\/git-lfs.github.com/ },
-                { name: 'Git LFS header', value: /^\s*oid sha256:/ },
-                { name: 'GGML data', value: /^lmgg|fmgg|tjgg|algg|fugg/ },
-                { name: 'HTML markup', value: /^\s*<(html|HTML)(\s+[^>]+)?>/ },
-                { name: 'HTML markup', value: /^\s*<!(doctype|DOCTYPE)\s*(html|HTML)>/ },
-                { name: 'HTML markup', value: /^\s*<!DOCTYPE\s*HTML\s+(PUBLIC|SYSTEM)?/ },
-                { name: 'Unity metadata', value: /^fileFormatVersion:/ },
-                { name: 'Python source code', value: /^((#.*(\n|\r\n))|('''.*'''(\n|\r\n))|("""[\s\S]*""")|(\n|\r\n))*(import[ ]+[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*([ ]+as[ ]+[a-zA-Z]\w*)?[ ]*(,|;|\n|\r\n))/ },
-                { name: 'Python source code', value: /^((#.*(\n|\r\n))|('''.*'''(\n|\r\n))|("""[\s\S]*""")|(\n|\r\n))*(from[ ]+([a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*)[ ]+import[ ]+[a-zA-Z]\w*)/ },
-                { name: 'Python virtual environment configuration', value: /^home[ ]*=[ ]*/, identifier: /^pyvenv\.cfg/ },
-                { name: 'Bash script', value: /^(#!\/usr\/bin\/env|#!\/bin\/bash)\s/ },
-                { name: 'TSD header', value: /^%TSD-Header-###%/ },
-                { name: 'AppleDouble data', value: /^\x00\x05\x16\x07/ },
-                { name: 'TensorFlow Hub module', value: /^\x08\x03$/, identifier: /^tfhub_module\.pb/ },
-                { name: 'V8 snapshot', value: /^.\x00\x00\x00.\x00\x00\x00/, identifier: /^snapshot_blob\.bin/ },
-                { name: 'V8 context snapshot', value: /^.\x00\x00\x00.\x00\x00\x00/, identifier: /^v8_context_snapshot\.bin/ },
-                { name: 'V8 natives blob', value: /^./, identifier: /^natives_blob\.bin/ },
-                { name: 'ViSQOL model', value: /^svm_type\s/ },
-                { name: 'SenseTime model', value: /^STEF/ },
                 { name: 'AES Crypt data', value: /^AES[\x01|\x02]\x00/ },
-                { name: 'BModel data', value: /^\xEE\xAA\x55\xFF/ }, // https://github.com/sophgo/tpu-mlir/blob/master/include/tpu_mlir/Builder/BM168x/bmodel.fbs
-                { name: 'CviModel data', value: /^CviModel/ }, // https://github.com/sophgo/tpu-mlir/blob/master/include/tpu_mlir/Builder/CV18xx/proto/cvimodel.fbs
-                { name: 'Tokenizer data', value: /^IQ== 0\n/ },
-                { name: 'BCNN model', value: /^BCNN/ },
+                { name: 'AppleDouble data', value: /^\x00\x05\x16\x07/ },
                 { name: 'base64 data', value: /^gAAAAAB/ },
-                { name: 'Mathematica Notebook data', value: /^\(\*\sContent-type:\sapplication\/vnd\.wolfram\.mathematica\s\*\)/ },
-                { name: 'llama2.c checkpoint', value: /^..\x00\x00..\x00\x00..\x00\x00..\x00\x00..\x00\x00..\x00\x00..\x00\x00/, identifier: /^stories\d+[KM]\.bin/ },
+                { name: 'Bash script', value: /^(#!\/usr\/bin\/env|#!\/bin\/bash)\s/ },
+                { name: 'BCNN model', value: /^BCNN/ },
+                { name: 'BModel data', value: /^\xEE\xAA\x55\xFF/ }, // https://github.com/sophgo/tpu-mlir/blob/master/include/tpu_mlir/Builder/BM168x/bmodel.fbs
                 { name: 'Cambricon model', value: /^\x7fMEF/ },
                 { name: 'Cambricon model', value: /^cambricon_offline/ },
-                { name: 'VNN model', value: /^\x2F\x4E\x00\x00.\x00\x00\x00/, identifier: /.vnnmodel$/ },
-                { name: 'XGBoost model', value: /^(binf|bs64)/ }, // https://github.com/dmlc/xgboost/blob/master/src/learner.cc
-                { name: 'SQLite data', value: /^SQLite format/ },
-                { name: 'Optimium model', value: /^EZMODEL/ }, // https://github.com/EZ-Optimium/Optimium,
-                { name: 'undocumented NNC data', value: /^(\xC0|\xBC)\x0F\x00\x00ENNC/ },
-                { name: 'Rich Text Format data', value: /^{\\rtf/ },
-                { name: 'Encrypted File data', value: /^ENCRYPTED_FILE/ },
+                { name: 'CviModel data', value: /^CviModel/ }, // https://github.com/sophgo/tpu-mlir/blob/master/include/tpu_mlir/Builder/CV18xx/proto/cvimodel.fbs
+                { name: 'ELF executable', value: /^\x7FELF/ },
+                { name: 'Encrypted File data', value: /^ENCRYPTED_FILE|EV_ENCRYPTED/ },
+                { name: 'GGML data', value: /^lmgg|fmgg|tjgg|algg|fugg/ },
+                { name: 'Git LFS header', value: /^\s*oid sha256:/ },
+                { name: 'Git LFS header', value: /^version https:\/\/git-lfs.github.com/ },
+                { name: 'HTML markup', value: /^\s*<!(doctype|DOCTYPE)\s*(html|HTML)>/ },
+                { name: 'HTML markup', value: /^\s*<!DOCTYPE\s*HTML\s+(PUBLIC|SYSTEM)?/ },
+                { name: 'HTML markup', value: /^\s*<(html|HTML)(\s+[^>]+)?>/ },
                 { name: 'Keras Tokenizer data', value: /^"{\\"class_name\\":\s*\\"Tokenizer\\"/ },
+                { name: 'llama2.c checkpoint', value: /^..\x00\x00..\x00\x00..\x00\x00..\x00\x00..\x00\x00..\x00\x00..\x00\x00/, identifier: /^stories\d+[KM]\.bin/ },
+                { name: 'Mathematica Notebook data', value: /^\(\*\sContent-type:\sapplication\/vnd\.wolfram\.mathematica\s\*\)/ },
                 { name: 'obfuscated data', value: /^obfs/ },
+                { name: 'Optimium model', value: /^EZMODEL/ }, // https://github.com/EZ-Optimium/Optimium,
+                { name: 'PNG image', value: /^\x89PNG/ },
+                { name: 'Python source code', value: /^((#.*(\n|\r\n))|('''.*'''(\n|\r\n))|("""[\s\S]*""")|(\n|\r\n))*(from[ ]+([a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*)[ ]+import[ ]+[a-zA-Z]\w*)/ },
+                { name: 'Python source code', value: /^((#.*(\n|\r\n))|('''.*'''(\n|\r\n))|("""[\s\S]*""")|(\n|\r\n))*(import[ ]+[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*([ ]+as[ ]+[a-zA-Z]\w*)?[ ]*(,|;|\n|\r\n))/ },
+                { name: 'Python virtual environment configuration', value: /^home[ ]*=[ ]*/, identifier: /^pyvenv\.cfg/ },
+                { name: 'Rich Text Format data', value: /^{\\rtf/ },
+                { name: 'SenseTime model', value: /^STEF/ },
+                { name: 'SQLite data', value: /^SQLite format/ },
+                { name: 'TensorFlow Hub module', value: /^\x08\x03$/, identifier: /^tfhub_module\.pb/ },
+                { name: 'Tokenizer data', value: /^IQ== 0\n/ },
+                { name: 'TSD header', value: /^%TSD-Header-###%/ },
+                { name: 'undocumented HALCON model', value: /^HDLMODEL/ },
+                { name: 'undocumented license data', value: /^This model and the software may not be used or distributed in any manner except as authorized under a valid written agreemen/ },
+                { name: 'undocumented NNC data', value: /^(\xC0|\xBC)\x0F\x00\x00ENNC/ },
+                { name: 'Unity metadata', value: /^fileFormatVersion:/ },
+                { name: 'V8 context snapshot', value: /^.\x00\x00\x00.\x00\x00\x00/, identifier: /^v8_context_snapshot\.bin/ },
+                { name: 'V8 natives blob', value: /^./, identifier: /^natives_blob\.bin/ },
+                { name: 'V8 snapshot', value: /^.\x00\x00\x00.\x00\x00\x00/, identifier: /^snapshot_blob\.bin/ },
+                { name: 'ViSQOL model', value: /^svm_type\s/ },
+                { name: 'VNN model', value: /^\x2F\x4E\x00\x00.\x00\x00\x00/, identifier: /.vnnmodel$/ },
             ];
             /* eslint-enable no-control-regex */
             const buffer = stream.peek(Math.min(4096, stream.length));

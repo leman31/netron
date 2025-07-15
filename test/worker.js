@@ -1,6 +1,7 @@
 
 import * as base from '../source/base.js';
 import * as fs from 'fs/promises';
+import * as node from '../source/node.js';
 import * as path from 'path';
 import * as process from 'process';
 import * as python from '../source/python.js';
@@ -97,11 +98,14 @@ host.TestHost = class {
         if (!exists) {
             throw new Error(`The file '${file}' does not exist.`);
         }
+        const stats = await fs.stat(pathname);
+        if (stats.isDirectory()) {
+            throw new Error(`The path '${file}' is a directory.`);
+        }
         if (encoding) {
             return await fs.readFile(pathname, encoding);
         }
-        const buffer = await fs.readFile(pathname, null);
-        return new base.BinaryStream(buffer);
+        return new node.FileStream(pathname, 0, stats.size, stats.mtimeMs);
     }
 
     event(/* name, params */) {
@@ -274,7 +278,7 @@ class HTMLElement {
     }
 
     getBoundingClientRect() {
-        return { left: 0, top: 0, wigth: 0, height: 0 };
+        return { left: 0, top: 0, width: 0, height: 0 };
     }
 
     scrollTo() {
@@ -342,6 +346,10 @@ class Window {
     }
 
     removeEventListener(/* event, callback */) {
+    }
+
+    requestAnimationFrame(callback) {
+        callback();
     }
 }
 
@@ -432,7 +440,9 @@ export class Target {
             const reader = response.body.getReader();
             const length = response.headers.has('Content-Length') ? parseInt(response.headers.get('Content-Length'), 10) : -1;
             let position = 0;
+            /* eslint-disable consistent-this */
             const target = this;
+            /* eslint-enable consistent-this */
             const stream = new ReadableStream({
                 async start(controller) {
                     const read = async () => {
@@ -489,13 +499,13 @@ export class Target {
             sourceFiles = sourceFiles.split(',').map((file) => file.trim());
             sources = sources && sources.startsWith(',') ? sources.substring(1).trim() : '';
         } else {
-            const commaIndex = sources.indexOf(',');
-            if (commaIndex === -1) {
+            const comma = sources.indexOf(',');
+            if (comma === -1) {
                 source = sources;
                 sources = '';
             } else {
-                source = sources.substring(0, commaIndex);
-                sources = sources.substring(commaIndex + 1);
+                source = sources.substring(0, comma);
+                sources = sources.substring(comma + 1);
             }
         }
         await Promise.all(targets.map((target) => {
@@ -545,15 +555,14 @@ export class Target {
         const stat = await fs.stat(target);
         let context = null;
         if (stat.isFile()) {
-            const buffer = await fs.readFile(target, null);
-            const reader = new base.BinaryStream(buffer);
+            const stream = new node.FileStream(target, 0, stat.size, stat.mtimeMs);
             const dirname = path.dirname(target);
-            context = new host.TestHost.Context(this.host, dirname, identifier, reader, new Map());
+            context = new host.TestHost.Context(this.host, dirname, identifier, stream, new Map());
         } else if (stat.isDirectory()) {
             const entries = new Map();
             const file = async (pathname) => {
-                const buffer = await fs.readFile(pathname, null);
-                const stream = new base.BinaryStream(buffer);
+                const stat = await fs.stat(pathname);
+                const stream = new node.FileStream(pathname, 0, stat.size, stat.mtimeMs);
                 const name = pathname.split(path.sep).join(path.posix.sep);
                 entries.set(name, stream);
             };
@@ -575,19 +584,21 @@ export class Target {
         }
         const modelFactoryService = new view.ModelFactoryService(this.host);
         this.model = await modelFactoryService.open(context);
+        this.view.update(this.model);
     }
 
     async validate() {
-        if (!this.model.format || (this.format && this.format !== this.model.format)) {
-            throw new Error(`Invalid model format '${this.model.format}'.`);
+        const model = this.model;
+        if (!model.format || (this.format && this.format !== model.format)) {
+            throw new Error(`Invalid model format '${model.format}'.`);
         }
-        if (this.producer && this.model.producer !== this.producer) {
-            throw new Error(`Invalid producer '${this.model.producer}'.`);
+        if (this.producer && model.producer !== this.producer) {
+            throw new Error(`Invalid producer '${model.producer}'.`);
         }
-        if (this.runtime && this.model.runtime !== this.runtime) {
-            throw new Error(`Invalid runtime '${this.model.runtime}'.`);
+        if (this.runtime && model.runtime !== this.runtime) {
+            throw new Error(`Invalid runtime '${model.runtime}'.`);
         }
-        if (this.model.metadata && !Array.isArray(this.model.metadata) && this.model.metadata.every((argument) => argument.name && argument.value)) {
+        if (model.metadata && (!Array.isArray(model.metadata) || !model.metadata.every((argument) => argument.name && argument.value))) {
             throw new Error("Invalid model metadata.'");
         }
         if (this.assert) {
@@ -595,7 +606,7 @@ export class Target {
                 const parts = assert.split('==').map((item) => item.trim());
                 const properties = parts[0].split('.');
                 const value = JSON.parse(parts[1].replace(/\s*'|'\s*/g, '"'));
-                let context = { model: this.model };
+                let context = { model };
                 while (properties.length) {
                     const property = properties.shift();
                     if (context[property] !== undefined) {
@@ -611,18 +622,18 @@ export class Target {
                             continue;
                         }
                     }
-                    throw new Error(`Invalid property path: '${parts[0]}`);
+                    throw new Error(`Invalid property path '${parts[0]}'.`);
                 }
                 if (context !== value) {
                     throw new Error(`Invalid '${context}' != '${assert}'.`);
                 }
             }
         }
-        if (this.model.version || this.model.description || this.model.author || this.model.license) {
+        if (model.version || model.description || model.author || model.license) {
             // continue
         }
         /* eslint-disable no-unused-expressions */
-        const validateGraph = async (graph) => {
+        const validateTarget = async (graph) => {
             const values = new Map();
             const validateValue = async (value) => {
                 if (value === null) {
@@ -711,15 +722,17 @@ export class Target {
                 for (const output of signature.outputs) {
                     output.name.toString();
                     output.name.length;
-                    for (const value of output.value) {
-                        /* eslint-disable no-await-in-loop */
-                        await validateValue(value);
-                        /* eslint-enable no-await-in-loop */
+                    if (Array.isArray(output.value)) {
+                        for (const value of output.value) {
+                            /* eslint-disable no-await-in-loop */
+                            await validateValue(value);
+                            /* eslint-enable no-await-in-loop */
+                        }
                     }
                 }
             }
-            if (graph.metadata && !Array.isArray(graph.metadata) && graph.metadata.every((argument) => argument.name && argument.value)) {
-                throw new Error("Invalid graph metadata.'");
+            if (graph.metadata && (!Array.isArray(graph.metadata) || !graph.metadata.every((argument) => argument.name && argument.value !== undefined))) {
+                throw new Error("Invalid graph metadata.");
             }
             for (const node of graph.nodes) {
                 const type = node.type;
@@ -728,14 +741,14 @@ export class Target {
                 }
                 if (Array.isArray(type.nodes)) {
                     /* eslint-disable no-await-in-loop */
-                    await validateGraph(type);
+                    await validateTarget(type);
                     /* eslint-enable no-await-in-loop */
                 }
                 view.Documentation.open(type);
                 node.name.toString();
                 node.description;
-                if (node.metadata && !Array.isArray(node.metadata) && node.metadata.every((argument) => argument.name && argument.value)) {
-                    throw new Error("Invalid graph metadata.'");
+                if (node.metadata && (!Array.isArray(node.metadata) || !node.metadata.every((argument) => argument.name && argument.value !== undefined))) {
+                    throw new Error("Invalid node metadata.");
                 }
                 const attributes = node.attributes;
                 if (attributes) {
@@ -746,7 +759,7 @@ export class Target {
                         const value = attribute.value;
                         if ((type === 'graph' || type === 'function') && value && Array.isArray(value.nodes)) {
                             /* eslint-disable no-await-in-loop */
-                            await validateGraph(value);
+                            await validateTarget(value);
                             /* eslint-enable no-await-in-loop */
                         } else {
                             let text = new view.Formatter(attribute.value, attribute.type).toString();
@@ -800,13 +813,18 @@ export class Target {
                 const sidebar = new view.NodeSidebar(this.view, node);
                 sidebar.render();
             }
-            const sidebar = new view.ModelSidebar(this.view, this.model, graph);
+            const sidebar = new view.ModelSidebar(this.view, model, graph);
             sidebar.render();
         };
-        /* eslint-enable no-unused-expressions */
-        for (const graph of this.model.graphs) {
+        for (const graph of model.graphs) {
             /* eslint-disable no-await-in-loop */
-            await validateGraph(graph);
+            await validateTarget(graph);
+            /* eslint-enable no-await-in-loop */
+        }
+        const functions = model.functions || [];
+        for (const func of functions) {
+            /* eslint-disable no-await-in-loop */
+            await validateTarget(func);
             /* eslint-enable no-await-in-loop */
         }
     }
@@ -831,7 +849,7 @@ if (!worker_threads.isMainThread) {
             const target = new Target(message);
             response.type = 'complete';
             response.target = target.name;
-            target.on('status', (_, message) => {
+            target.on('status', (sender, message) => {
                 message = { type: 'status', ...message };
                 worker_threads.parentPort.postMessage(message);
             });

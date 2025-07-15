@@ -227,7 +227,7 @@
     "name": "AveragePooling2D",
     "module": "keras.layers",
     "category": "Pool",
-    "description": "Average pooling operation for 2D spatial data.\n\nDownsamples the input along its spatial dimensions (height and width)\nby taking the average value over an input window\n(of size defined by `pool_size`) for each channel of the input.\nThe window is shifted by `strides` along each dimension.\n\nThe resulting output when using the `\"valid\"` padding option has a spatial\nshape (number of rows or columns) of:\n`output_shape = math.floor((input_shape - pool_size) / strides) + 1`\n(when `input_shape >= pool_size`)\n\nThe resulting output shape when using the `\"same\"` padding option is:\n`output_shape = math.floor((input_shape - 1) / strides) + 1`",
+    "description": "Average pooling operation for 2D spatial data.\n\nDownsamples the input along its spatial dimensions (height and width)\nby taking the average value over an input window\n(of size defined by `pool_size`) for each channel of the input.\nThe window is shifted by `strides` along each dimension.\n\nThe resulting output when using the `\"valid\"` padding option has a spatial\nshape (number of rows or columns) of:\n`output_shape = math.floor((input_shape - pool_size) / strides) + 1`\n(when `input_shape >= pool_size`)\n\nThe resulting output shape when using the `\"same\"` padding option is:\n`output_shape = input_shape`",
     "attributes": [
       {
         "default": "channels_last",
@@ -998,7 +998,7 @@
       },
       {
         "default": "channels_last",
-        "description": "string, either `\"channels_last\"` or `\"channels_first\"`.\n        The ordering of the dimensions in the inputs. `\"channels_last\"`\n        corresponds to inputs with shape\n        `(batch_size, height, width, channels)`\n        while `\"channels_first\"` corresponds to inputs with shape\n        `(batch_size, channels, height, width)`. It defaults to the\n        `image_data_format` value found in your Keras config file at\n        `~/.keras/keras.json`. If you never set it, then it will be\n        `\"channels_last\"`.",
+        "description": "string, either `\"channels_last\"` or `\"channels_first\"`.\n        The ordering of the dimensions in the inputs. `\"channels_last\"`\n        corresponds to inputs with shape\n        `(batch_size, height, width, channels)`\n        while `\"channels_first\"` corresponds to inputs with shape\n        `(batch_size, channels, height, width)`. It defaults to the\n        `image_data_format` value found in your Keras config file at\n        `~/.keras/keras.json`. If you never set it, then it will be\n        `\"channels_last\"`.\n     dilation_rate: An integer or tuple/list of 2 integers,\n        specifying the dilation rate for\n        all spatial dimensions for dilated convolution.\n        Specifying different dilation rates\n        for different dimensions is not supported.\n        Currently, specifying any `dilation_rate` value != 1 is\n        incompatible with specifying any stride value != 1.",
         "name": "data_format"
       },
       {
@@ -1062,7 +1062,7 @@
         "name": "bias_constraint"
       },
       {
-        "description": "An integer or tuple/list of 2 integers,\n    specifying the amount of padding along the height and width\n    of the output tensor.\n    Can be a single integer to specify the same value for all\n    spatial dimensions.\n    The amount of output padding along a given dimension must be\n    lower than the stride along that same dimension.\n    If set to `None` (default), the output shape is inferred.",
+        "description": "An integer or tuple/list of 2 integers,\n        specifying the amount of padding along the height and width\n        of the output tensor.\n        Can be a single integer to specify the same value for all\n        spatial dimensions.\n        The amount of output padding along a given dimension must be\n        lower than the stride along that same dimension.\n        If set to `None` (default), the output shape is inferred.",
         "name": "output_padding"
       }
     ],
@@ -1779,6 +1779,10 @@
       {
         "name": "lora_rank",
         "description": "Optional integer. If set, the layer's forward pass\n        will implement LoRA (Low-Rank Adaptation)\n        with the provided rank. LoRA sets the layer's kernel\n        to non-trainable and replaces it with a delta over the\n        original kernel, obtained via multiplying two lower-rank\n        trainable matrices. This can be useful to reduce the\n        computation cost of fine-tuning large dense layers.\n        You can also enable LoRA on an existing\n        `Dense` layer by calling `layer.enable_lora(rank)`."
+      },
+      {
+        "name": "lora_alpha",
+        "description": "Optional integer. If set, this parameter scales the\n        low-rank adaptation delta (computed as the product of two lower-rank\n        trainable matrices) during the forward pass. The delta is scaled by\n        `lora_alpha / lora_rank`, allowing you to fine-tune the strength of\n        the LoRA adjustment independently of `lora_rank`."
       }
     ],
     "inputs": [
@@ -2057,6 +2061,10 @@
       {
         "name": "weights",
         "description": "Optional floating-point matrix of size\n        `(input_dim, output_dim)`. The initial embeddings values\n        to use."
+      },
+      {
+        "name": "lora_alpha",
+        "description": "Optional integer. If set, this parameter scales the\n        low-rank adaptation delta (computed as the product of two lower-rank\n        trainable matrices) during the forward pass. The delta is scaled by\n        `lora_alpha / lora_rank`, allowing you to fine-tune the strength of\n        the LoRA adjustment independently of `lora_rank`."
       }
     ],
     "inputs": [
