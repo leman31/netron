@@ -5461,30 +5461,6 @@ markdown.Generator = class {
 
 metadata.Attachment = class {
 
-    constructor() {
-        this.metadata = new metadata.Attachment.Container('metadata');
-        this.metrics = new metadata.Attachment.Container('metrics');
-    }
-
-    async open(context) {
-        context = new view.Context(context);
-        if (context.identifier.toLowerCase().endsWith('.json')) {
-            const data = await context.peek('json');
-            if (data && data.signature === 'netron:attachment') {
-                const containers = [this.metadata, this.metrics];
-                for (const container of containers) {
-                    container.open(data[container.name]);
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-};
-
-metadata.Attachment.Container = class {
-
     constructor(name) {
         this._name = name;
         this._entries = new Map();

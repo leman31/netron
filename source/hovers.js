@@ -21,11 +21,13 @@ class Req {
                             if (child.style && list_t.children[j].hasAttribute("style")) {
                                 list_t.children[j].removeAttribute("style");
                             }
+                            console.log("merge");
                             if (child.hover && list_t.children[j + 1].innerHTML !== '') {
                                 list_t.children[j + 1].innerHTML = '';
                             }
                         }
                     }
+                    console.log("a mers");
                 } else {
                     const parent_n = document.getElementById("nodes");
                     let idx = 1;
@@ -56,8 +58,11 @@ class Req {
                 }
             }
         }
+        console.log(document.getElementById("list-attributes"));
+        console.log(document.getElementById("list-modified"));
         document.getElementById("list-attributes").innerHTML = '';
         document.getElementById("list-modified").innerHTML = '';
+        console.log("innerHTML");
         const body = document.body;
         const children = body.children;
         for (let i = children.length - 1; i >= 0; i--) {
@@ -516,7 +521,6 @@ class Req {
                                             Req.solve_bugs();
                                             throw new Error(`You provided an invalid key: ${first.toLowerCase()}`);
                                         }
-
                                 child_meta.innerHTML = JSON.stringify(obj);
                                 another.innerHTML = JSON.stringify(obj2);
                                 continue;
@@ -562,6 +566,7 @@ class Req {
                     // the hovering and the buttons.
                     if (document.getElementById("list-attributes").children) {
                         const list_attr = document.getElementById("list-attributes");
+                        console.log(list_attr);
                         const list_modif = document.getElementById("list-modified");
                         const parent_t = document.getElementById("edge-paths");
                         const parent_n = document.getElementById("nodes");
@@ -576,6 +581,7 @@ class Req {
                                 for (let idx = 0; idx < len; idx++) {
                                     const obj = JSON.parse(list_attr.children[i].innerHTML);
                                     const obj2 = JSON.parse(list_modif.children[i].innerHTML);
+                                    console.log("innerhtml1");
                                     if (results[idx][1].id.split("\n")[1] === obj.id) {
                                         obj.new_id = idx;
                                         obj.tensorname = results[idx][1].id;
@@ -589,6 +595,7 @@ class Req {
                                         if (obj.hover) {
                                             parent_t.children[idx + 1].innerHTML = `<title>${
                                                 obj.hover.match(/.{1,20}/g).join("\n")}</title>`;
+                                            console.log("hover");
                                         }
                                         const keys = Object.keys(obj);
                                         // Block of code whick adds image item to be displayed.
@@ -619,6 +626,7 @@ class Req {
                                         break;
                                     }
                                 }
+
                                 if (flag === 0) {
                                     Req.solve_bugs();
                                     throw new Error(`Index of tensor not found :${JSON.parse(list_attr.children[i].innerHTML).id}`);
@@ -734,7 +742,7 @@ class Req {
                         if (op.tensor_ondblclick_command) {
                             try {
                                 const execSync = require('child_process').execSync;
-                                execSync(op.tensor_ondblclick_command, { shell: true });
+                                execSync(op.tensor_ondblclick_command, { shell: true, encoding: 'utf-8' });
                             } catch (Err) {
                                 alert(`Error when running the command ${
                                     op.tensor_ondblclick_command}: ${Err.message}`);
@@ -771,7 +779,7 @@ class Req {
                         if (op.operator_ondblclick_command) {
                             try {
                                 const execSync = require('child_process').execSync;
-                                execSync(op.operator_ondblclick_command, { shell: true });
+                                execSync(op.operator_ondblclick_command, { shell: true, encoding: 'utf-8' });
                             } catch (Err) {
                                 const result = op.operator_ondblclick_command;
                                 alert(`Error when running the command ${result}: ${Err.message}`);
