@@ -80,35 +80,29 @@ transformers.ModelFactory = class {
 transformers.Model = class {
 
     constructor(config, tokenizer, tokenizer_config, vocab) {
-        this.modules = [];
+        this.format = 'Transformers';
         this.metadata = [];
-        if (config) {
-            this.format = 'Transformers';
-            this.modules.push(new transformers.Graph(config));
-        }
-        if (tokenizer || tokenizer_config) {
-            this.format = this.format || 'Transformers Tokenizer';
-            this.modules.push(new transformers.Tokenizer(tokenizer, tokenizer_config));
-        }
-        if (vocab) {
-            this.format = this.format || 'Transformers Vocabulary';
-            this.modules.push(new transformers.Vocabulary(vocab));
-        }
+        this.modules = [new transformers.Graph(config, tokenizer, tokenizer_config, vocab)];
     }
 };
 
 transformers.Graph = class {
 
-    constructor(context) {
+    constructor(config, tokenizer, tokenizer_config, vocab) {
         this.type = 'graph';
-        this.name = context.identifier;
         this.nodes = [];
         this.inputs = [];
         this.outputs = [];
         this.metadata = [];
-        for (const [key, value] of Object.entries(context.value)) {
-            const argument = new transformers.Argument(key, value);
-            this.metadata.push(argument);
+        if (config) {
+            for (const [key, value] of Object.entries(config.value)) {
+                const argument = new transformers.Argument(key, value);
+                this.metadata.push(argument);
+            }
+        }
+        if (tokenizer || tokenizer_config) {
+            const node = new transformers.Tokenizer(tokenizer, tokenizer_config, vocab);
+            this.nodes.push(node);
         }
     }
 };
@@ -116,24 +110,57 @@ transformers.Graph = class {
 transformers.Tokenizer = class {
 
     constructor(tokenizer, tokenizer_config) {
-        this.type = 'tokenizer';
+        this.type = { name: 'tokenizer' };
         this.name = (tokenizer || tokenizer_config).identifier;
+        this.attributes = [];
+        if (tokenizer) {
+            const obj = tokenizer.value;
+            const keys = new Set(['decoder', 'model', 'post_processor', 'pre_tokenizer']);
+            for (const [key, value] of Object.entries(tokenizer.value)) {
+                if (!keys.has(key)) {
+                    const argument = new transformers.Argument(key, value);
+                    this.attributes.push(argument);
+                }
+            }
+            for (const key of keys) {
+                if (obj[key]) {
+                    const module = new transformers.Object(key, obj[key]);
+                    const argument = new transformers.Argument(key, module, 'object');
+                    this.attributes.push(argument);
+                }
+            }
+        }
     }
 };
 
 transformers.Vocabulary = class {
 
     constructor(context) {
-        this.type = 'vocabulary';
+        this.type = { name: 'vocabulary' };
         this.name = context.identifier;
+        this.attributes = [];
+        this.attributes.push(new transformers.Argument('size', Object.keys(context.value).length));
+    }
+};
+
+transformers.Object = class {
+
+    constructor(type, obj) {
+        this.type = { name: type };
+        this.attributes = [];
+        for (const [key, value] of Object.entries(obj)) {
+            const argument = new transformers.Argument(key, value);
+            this.attributes.push(argument);
+        }
     }
 };
 
 transformers.Argument = class {
 
-    constructor(name, value) {
+    constructor(name, value, type) {
         this.name = name;
         this.value = value;
+        this.type = type || null;
     }
 };
 

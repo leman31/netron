@@ -8467,7 +8467,7 @@
     "type":     "transformers",
     "target":   "tokenizer.json",
     "source":   "https://github.com/user-attachments/files/16203071/tokenizer.json.zip[tokenizer.json]",
-    "format":   "Transformers Tokenizer",
+    "format":   "Transformers",
     "link":     "https://github.com/lutzroeder/netron/issues/1480"
   },
   {
