@@ -661,6 +661,7 @@ view.View = class {
             { message: /^Unsupported Protocol Buffers content/, issue: '593' },
             { message: /^Unsupported Protocol Buffers text content/, issue: '594' },
             { message: /^Unsupported JSON content/, issue: '595' },
+            { message: /^Unknown type name '__torch__\./, issue: '969' },
             { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto \(Unexpected end of file\)\./, issue: '1155' },
             { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto \(Cannot read properties of undefined \(reading 'ModelProto'\)\)\./, issue: '1156' },
             { name: 'Error loading ONNX model.', message: /^File format is not onnx\.ModelProto/, issue: '549' }
@@ -701,8 +702,8 @@ view.View = class {
             }
             await this._timeout(20);
             const stack = [];
-            if (Array.isArray(model.graphs) && model.graphs.length > 0) {
-                const [graph] = model.graphs;
+            if (Array.isArray(model.modules) && model.modules.length > 0) {
+                const [graph] = model.modules;
                 const signature = Array.isArray(graph.signatures) && graph.signatures.length > 0 ? graph.signatures[0] : null;
                 stack.push({ target: graph, signature });
             } else if (Array.isArray(model.functions) && model.functions.length > 0) {
@@ -869,9 +870,11 @@ view.View = class {
         while (canvas.lastChild) {
             canvas.removeChild(canvas.lastChild);
         }
-        if (!graph) {
+        if (!graph || graph.type === 'tokenizer' || graph.type === 'vocabulary') {
             return '';
         }
+        const document = this._host.document;
+        const window = this._host.window;
         this._zoom = 1;
         const groups = graph.groups || false;
         const nodes = graph.nodes;
@@ -883,16 +886,29 @@ view.View = class {
         viewGraph.add(graph, signature);
         // Workaround for Safari background drag/zoom issue:
         // https://stackoverflow.com/questions/40887193/d3-js-zoom-is-not-working-with-mousewheel-in-safari
-        const background = this._host.document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         background.setAttribute('id', 'background');
         background.setAttribute('fill', 'none');
         background.setAttribute('pointer-events', 'all');
         canvas.appendChild(background);
-        const origin = this._host.document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const origin = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         origin.setAttribute('id', 'origin');
         canvas.appendChild(origin);
-        viewGraph.build(this._host.document, origin);
-        await this._timeout(20);
+        viewGraph.build(document, origin);
+        if (document.fonts && document.fonts.ready) {
+            try {
+                await document.fonts.ready;
+            } catch {
+                // continue regardless of error
+            }
+        }
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(resolve);
+                });
+            });
+        });
         viewGraph.measure();
         const status = await viewGraph.layout(this._worker);
         if (status === '') {
@@ -1105,6 +1121,12 @@ view.View = class {
                     break;
                 case 'weights':
                     title = 'Weights Properties';
+                    break;
+                case 'tokenizer':
+                    title = 'Tokenizer Properties';
+                    break;
+                case 'vocabulary':
+                    title = 'Vocabulary Properties';
                     break;
                 default:
                     throw new view.Error(`Unsupported graph type '${type}'.`);
@@ -1759,8 +1781,7 @@ view.Worker = class {
             this._worker.postMessage(message);
             this._timeout = setTimeout(async () => {
                 await this._host.message(notification, null, 'Cancel');
-                this._terminate();
-                this._cancel();
+                this._cancel(true);
                 delete this._resolve;
                 delete this._reject;
                 resolve({ type: 'cancel' });
@@ -1772,7 +1793,7 @@ view.Worker = class {
         if (!this._worker) {
             this._worker = this._host.worker('./worker');
             this._worker.addEventListener('message', (e) => {
-                this._cancel();
+                this._cancel(false);
                 const message = e.data;
                 const resolve = this._resolve;
                 const reject = this._reject;
@@ -1786,8 +1807,7 @@ view.Worker = class {
                 }
             });
             this._worker.addEventListener('error', (e) => {
-                this._terminate();
-                this._cancel();
+                this._cancel(true);
                 const reject = this._reject;
                 delete this._resolve;
                 delete this._reject;
@@ -1798,14 +1818,12 @@ view.Worker = class {
         }
     }
 
-    _terminate() {
-        if (this._worker) {
+    _cancel(terminate) {
+        terminate = terminate || this._host.type === 'Test';
+        if (this._worker && terminate) {
             this._worker.terminate();
             this._worker = null;
         }
-    }
-
-    _cancel() {
         if (this._timeout >= 0) {
             clearTimeout(this._timeout);
             this._timeout = -1;
@@ -2717,13 +2735,13 @@ view.TargetSelector = class extends view.Control {
                 }
             }
         };
-        const graphs = [];
+        const modules = [];
         const signatures = [];
         const functions = [];
-        if (model && Array.isArray(model.graphs)) {
-            for (const graph of model.graphs) {
+        if (model && Array.isArray(model.modules)) {
+            for (const graph of model.modules) {
                 const name = graph.name || '(unnamed)';
-                graphs.push({ name, target: graph, signature: null });
+                modules.push({ name, target: graph, signature: null });
                 if (Array.isArray(graph.functions)) {
                     for (const func of graph.functions) {
                         functions.push({ name: `${name}.${func.name}`, target: func, signature: null });
@@ -2741,10 +2759,10 @@ view.TargetSelector = class extends view.Control {
                 functions.push({ name: func.name, target: func, signature: null });
             }
         }
-        section('Graphs', graphs);
+        section('Modules', modules);
         section('Signatures', signatures);
         section('Functions', functions);
-        const visible = functions.length > 0 || signatures.length > 0 || graphs.length > 1;
+        const visible = functions.length > 0 || signatures.length > 0 || modules.length > 1;
         this._element.style.display = visible ? 'inline' : 'none';
     }
 };
@@ -6202,6 +6220,7 @@ view.ModelFactoryService = class {
         this.register('./qnn', ['.json', '.bin', '.serialized', '.dlc']);
         this.register('./kann', ['.kann', '.bin', '.kgraph'], [], [/^....KaNN/]);
         this.register('./xgboost', ['.xgb', '.xgboost', '.json', '.model', '.bin', '.txt'], [], [/^{L\x00\x00/, /^binf/, /^bs64/, /^\s*booster\[0\]:/]);
+        this.register('./transformers', ['.json']);
         this.register('', ['.cambricon', '.vnnmodel', '.nnc']);
         /* eslint-enable no-control-regex */
     }
@@ -6329,18 +6348,10 @@ view.ModelFactoryService = class {
                     { name: 'Trace Event data', tags: ['traceEvents'] },
                     { name: 'Trace Event data', tags: ['[].pid', '[].ph'] },
                     { name: 'Diffusers configuration', tags: ['_class_name', '_diffusers_version'] },
-                    { name: 'Transformers configuration', tags: ['architectures', 'model_type'] }, // https://huggingface.co/docs/transformers/en/create_a_model
                     { name: 'Transformers generation configuration', tags: ['transformers_version'] },
-                    { name: 'Transformers tokenizer configuration', tags: ['tokenizer_class'] },
-                    { name: 'Transformers tokenizer configuration', tags: ['bos_token', 'eos_token', 'unk_token'] },
-                    { name: 'Transformers tokenizer configuration', tags: ['bos_token', 'eos_token', 'pad_token'] },
-                    { name: 'Transformers tokenizer configuration', tags: ['additional_special_tokens'] },
-                    { name: 'Transformers tokenizer configuration', tags: ['special_tokens_map_file'] },
-                    { name: 'Transformers tokenizer configuration', tags: ['full_tokenizer_file'] },
                     { name: 'Transformers vocabulary data', tags: ['<|im_start|>'] },
                     { name: 'Transformers vocabulary data', tags: ['<|endoftext|>'] },
                     { name: 'Transformers preprocessor configuration', tags: ['crop_size', 'do_center_crop', 'image_mean', 'image_std', 'do_resize'] },
-                    { name: 'Tokenizers data', tags: ['version', 'added_tokens', 'model'] }, // https://github.com/huggingface/tokenizers/blob/main/tokenizers/src/tokenizer/serialization.rs
                     { name: 'Tokenizer data', tags: ['<eos>', '<bos>'] },
                     { name: 'Jupyter Notebook data', tags: ['cells', 'nbformat'] },
                     { name: 'Kaggle credentials', tags: ['username','key'] },
@@ -6705,7 +6716,7 @@ view.ModelFactoryService = class {
     _filter(context) {
         const identifier = context.identifier.toLowerCase().split('/').pop();
         const stream = context.stream;
-        if (stream) {
+        if (stream && stream.length < 0x7FFFFFFF) {
             const buffer = stream.peek(Math.min(4096, stream.length));
             const content = String.fromCharCode.apply(null, buffer);
             const list = this._factories.filter((entry) =>
